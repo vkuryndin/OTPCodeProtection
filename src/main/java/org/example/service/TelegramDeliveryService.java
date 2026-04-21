@@ -12,6 +12,9 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 public class TelegramDeliveryService {
 
@@ -58,12 +61,21 @@ public class TelegramDeliveryService {
             );
 
             if (response.statusCode() != 200) {
+                log.error("Failed to send Telegram message: userId={}, operationId={}, chatId={}, statusCode={}",
+                        userId, operationId, chatId, response.statusCode());
                 throw new RuntimeException("Failed to send Telegram message");
             }
+
+            log.info("Telegram OTP sent: userId={}, operationId={}, chatId={}",
+                    userId, operationId, chatId);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            log.error("Failed to send Telegram message: userId={}, operationId={}, chatId={}",
+                    userId, operationId, chatId, e);
             throw new RuntimeException("Failed to send Telegram message", e);
         } catch (IOException e) {
+            log.error("Failed to send Telegram message: userId={}, operationId={}, chatId={}",
+                    userId, operationId, chatId, e);
             throw new RuntimeException("Failed to send Telegram message", e);
         }
     }

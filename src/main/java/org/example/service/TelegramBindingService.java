@@ -20,6 +20,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 public class TelegramBindingService {
 
@@ -32,6 +35,7 @@ public class TelegramBindingService {
     private final String botToken;
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final Logger log = LoggerFactory.getLogger(TelegramBindingService.class);
 
     public TelegramBindingService(UserRepository userRepository,
                                   EmailDeliveryService emailDeliveryService,
@@ -50,10 +54,13 @@ public class TelegramBindingService {
     public Map<String, Object> startBinding(Long userId) {
         User user = userRepository.findById(userId);
         if (user == null) {
+            log.warn("Telegram bind start failed: user not found, userId={}", userId);
             throw new IllegalArgumentException("User not found");
         }
 
         if (isBlank(user.getEmail())) {
+            log.warn("Telegram bind start failed: email is not set, userId={}, login={}",
+                    userId, user.getLogin());
             throw new IllegalArgumentException("User email is not set");
         }
 
@@ -66,6 +73,9 @@ public class TelegramBindingService {
 
         emailDeliveryService.sendTelegramBindEmail(user.getEmail(), bindLink, expiresAt);
 
+        log.info("Telegram bind started: userId={}, login={}, email={}, expiresAt={}",
+                userId, user.getLogin(), user.getEmail(), expiresAt);
+
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("message", "Telegram bind link sent successfully");
         response.put("email", user.getEmail());
@@ -73,27 +83,38 @@ public class TelegramBindingService {
 
         return response;
     }
+
     public Map<String, Object> completeBinding(Long userId) {
         User user = userRepository.findById(userId);
         if (user == null) {
+            log.warn("Telegram bind complete failed: user not found, userId={}", userId);
             throw new IllegalArgumentException("User not found");
         }
 
         if (isBlank(user.getTelegramBindToken())) {
+            log.warn("Telegram bind complete failed: bind token is not set, userId={}, login={}",
+                    userId, user.getLogin());
             throw new IllegalArgumentException("Telegram bind token is not set");
         }
 
         if (user.getTelegramBindExpiresAt() == null
                 || user.getTelegramBindExpiresAt().isBefore(LocalDateTime.now())) {
+            log.warn("Telegram bind complete failed: bind token expired, userId={}, login={}",
+                    userId, user.getLogin());
             throw new IllegalArgumentException("Telegram bind token expired");
         }
 
         String chatId = findChatIdByBindToken(user.getTelegramBindToken());
         if (isBlank(chatId)) {
+            log.warn("Telegram bind complete failed: chat id not found, userId={}, login={}",
+                    userId, user.getLogin());
             throw new IllegalArgumentException("Telegram chat id not found for bind token");
         }
 
         userRepository.bindTelegramChatId(userId, chatId);
+
+        log.info("Telegram bound successfully: userId={}, login={}, chatId={}",
+                userId, user.getLogin(), chatId);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("message", "Telegram bound successfully");

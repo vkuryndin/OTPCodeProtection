@@ -16,6 +16,9 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 public class SmsDeliveryService {
 
@@ -88,9 +91,16 @@ public class SmsDeliveryService {
                     (byte) 0,
                     text.getBytes(StandardCharsets.UTF_8)
             );
+
+            log.info("OTP SMS sent: userId={}, operationId={}, phone={}",
+                    userId, operationId, phone.trim());
         } catch (java.io.IOException e) {
-            throw new RuntimeException("Cannot connect to SMPP simulator on " + host + ":" + port, e);
+            log.error("Failed to send OTP SMS: SMPP simulator unavailable, userId={}, operationId={}, phone={}",
+                    userId, operationId, phone, e);
+            throw new RuntimeException("SMPP simulator is not available. Start the SMPP server and try again.", e);
         } catch (Exception e) {
+            log.error("Failed to send OTP SMS: userId={}, operationId={}, phone={}",
+                    userId, operationId, phone, e);
             throw new RuntimeException("Failed to send SMS", e);
         } finally {
             try {

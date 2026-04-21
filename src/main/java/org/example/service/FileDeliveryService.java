@@ -8,8 +8,12 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 public class FileDeliveryService {
+    private static final Logger log = LoggerFactory.getLogger(FileDeliveryService.class);
 
     public void saveOtpToFile(String fileName,
                               Long userId,
@@ -38,7 +42,12 @@ public class FileDeliveryService {
                     StandardOpenOption.CREATE,
                     StandardOpenOption.APPEND
             );
+
+            log.info("OTP saved to file: userId={}, operationId={}, file={}",
+                    userId, operationId, path.toAbsolutePath());
         } catch (IOException e) {
+            log.error("Failed to save OTP to file: userId={}, operationId={}, file={}",
+                    userId, operationId, path.toAbsolutePath(), e);
             throw new RuntimeException("Failed to save OTP to file", e);
         }
     }

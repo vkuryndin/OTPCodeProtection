@@ -13,11 +13,15 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Properties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 public class EmailDeliveryService {
 
     private final Session session;
     private final String fromEmail;
+    private static final Logger log = LoggerFactory.getLogger(EmailDeliveryService.class);
 
     public EmailDeliveryService(
             @Value("${email.username}") String username,
@@ -66,7 +70,12 @@ public class EmailDeliveryService {
             );
 
             Transport.send(message);
+
+            log.info("OTP email sent: userId={}, operationId={}, to={}",
+                    userId, operationId, toEmail.trim());
         } catch (Exception e) {
+            log.error("Failed to send OTP email: userId={}, operationId={}, to={}",
+                    userId, operationId, toEmail, e);
             throw new RuntimeException("Failed to send email", e);
         }
     }
@@ -87,7 +96,9 @@ public class EmailDeliveryService {
             );
 
             Transport.send(message);
+            log.info("Telegram bind email sent: to={}, expiresAt={}", toEmail.trim(), expiresAt);
         } catch (Exception e) {
+            log.error("Failed to send telegram bind email: to={}", toEmail, e);
             throw new RuntimeException("Failed to send email", e);
         }
     }

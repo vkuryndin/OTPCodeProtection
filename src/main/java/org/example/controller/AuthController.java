@@ -47,7 +47,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request) {
         User user = authService.authenticate(request.getLogin(), request.getPassword());
-        String token = authService.loginAndGenerateToken(request.getLogin(), request.getPassword());
+        String token = tokenService.generateToken(user);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("message", "Login successful");
