@@ -29,6 +29,8 @@ public class SmsDeliveryService {
     private final String systemType;
     private final String sourceAddr;
 
+    private static final Logger log = LoggerFactory.getLogger(SmsDeliveryService.class);
+
     public SmsDeliveryService(@Value("${smpp.host}") String host,
                               @Value("${smpp.port}") int port,
                               @Value("${smpp.system-id}") String systemId,
@@ -95,12 +97,12 @@ public class SmsDeliveryService {
             log.info("OTP SMS sent: userId={}, operationId={}, phone={}",
                     userId, operationId, phone.trim());
         } catch (java.io.IOException e) {
-            log.error("Failed to send OTP SMS: SMPP simulator unavailable, userId={}, operationId={}, phone={}",
-                    userId, operationId, phone, e);
+            log.warn("SMPP simulator is not available: userId={}, operationId={}, phone={}, host={}, port={}",
+                    userId, operationId, phone, host, port);
             throw new RuntimeException("SMPP simulator is not available. Start the SMPP server and try again.", e);
         } catch (Exception e) {
-            log.error("Failed to send OTP SMS: userId={}, operationId={}, phone={}",
-                    userId, operationId, phone, e);
+            log.error("Failed to send OTP SMS: userId={}, operationId={}, phone={}, error={}",
+                    userId, operationId, phone, e.getMessage());
             throw new RuntimeException("Failed to send SMS", e);
         } finally {
             try {

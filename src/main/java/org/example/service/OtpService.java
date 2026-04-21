@@ -171,8 +171,8 @@ public class OtpService {
                 );
             }
         } catch (RuntimeException e) {
-            log.error("OTP delivery failed: otpId={}, userId={}, operationId={}, channel={}",
-                    otpId, userId, otpCode.getOperationId(), otpCode.getDeliveryChannel(), e);
+            log.error("OTP delivery failed: otpId={}, userId={}, operationId={}, channel={}, error={}",
+                    otpId, userId, otpCode.getOperationId(), otpCode.getDeliveryChannel(), e.getMessage());
             throw e;
         }
 

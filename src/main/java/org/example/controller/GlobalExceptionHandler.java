@@ -70,7 +70,15 @@ public class GlobalExceptionHandler {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("error", e.getMessage());
 
-        log.error("HTTP 500: {} {} -> {}", request.getMethod(), request.getRequestURI(), e.getMessage(), e);
+        String message = e.getMessage();
+
+        if ("SMPP simulator is not available. Start the SMPP server and try again.".equals(message)
+                || (message != null && message.startsWith("Cannot connect to SMPP simulator"))) {
+            log.warn("HTTP 503: {} {} -> {}", request.getMethod(), request.getRequestURI(), message);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+        }
+
+        log.error("HTTP 500: {} {} -> {}", request.getMethod(), request.getRequestURI(), message, e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }

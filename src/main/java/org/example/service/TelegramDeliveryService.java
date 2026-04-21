@@ -21,6 +21,7 @@ public class TelegramDeliveryService {
     private final String telegramApiUrl;
     private final String botToken;
     private final HttpClient httpClient = HttpClient.newHttpClient();
+    private static final Logger log = LoggerFactory.getLogger(TelegramDeliveryService.class);
 
     public TelegramDeliveryService(@Value("${telegram.api-url}") String telegramApiUrl,
                                    @Value("${telegram.bot-token}") String botToken) {
