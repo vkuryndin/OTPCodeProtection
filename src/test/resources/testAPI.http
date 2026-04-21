@@ -1,8 +1,9 @@
 ### Base variables
 @host = http://localhost:8080
-@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3MDMyNSwiZXhwIjoxNzc2NzcwMzg1fQ.eei9yo_oGSevIbh651JLRMXIHNZvb8HfqIYSUVhGFiSNqlKiwUtFd71ECL6Ws_Y4
-@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI1IiwibG9naW4iOiJ1c2VyXzIiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc3MDQxOCwiZXhwIjoxNzc2NzcwNDc4fQ.e5P2qbZWZlzHCXvvy0NAZe3n0XiS5j_rzGCH0_epUgC7YlsJnq6i474-TN3MfkFV
-@userId = 6
+@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3MzA4MCwiZXhwIjoxNzc2Nzc2NjgwfQ.VGTx7zNo3MUoqsx0BzEQ64LvzlEjFjNqB39wJLSxhYVOv-mpgHxBaZxkhip6hFBs
+@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI1IiwibG9naW4iOiJ1c2VyXzIiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc3MzAxOCwiZXhwIjoxNzc2Nzc2NjE4fQ.x9No4k3Dg_U-jwAXnv2o-kT3LdSAOUBnagpq58lVKPtNeVfgn40k6_7voiJ3WBJD"
+@userId = 5
+
 ### =====================================
 ### 1. HEALTH
 ### =====================================
@@ -36,6 +37,20 @@ Content-Type: application/json
 
 {
   "login": "user_3",
+  "password": "12345678",
+  "role": "USER",
+  "email": "user2@test.com",
+  "phone": "+37400112233",
+  "telegramChatId": "123456789"
+}
+
+
+### Register user - valid
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "user_4",
   "password": "12345678",
   "role": "USER",
   "email": "user2@test.com",
@@ -148,7 +163,25 @@ POST {{host}}/auth/login
 Content-Type: application/json
 
 {
+  "login": "user_3",
+  "password": "12345678"
+}
+
+### Login as user - valid
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
   "login": "user_2",
+  "password": "12345678"
+}
+
+### Login as user - valid
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "user_4",
   "password": "12345678"
 }
 
@@ -211,6 +244,9 @@ GET {{host}}/admin/users
 Authorization: Bearer {{userToken}}
 Accept: application/json
 
+### =====================================
+### 7. DELETE TESTS
+### =====================================
 
 ### users delete test
 ### Delete user as admin
@@ -233,6 +269,10 @@ Authorization: Bearer {{adminToken}}
 Accept: application/json
 
 
+### =====================================
+### 8. LOGOUT
+### =====================================
+
 ### Logout (valid token)
 POST {{host}}/auth/logout
 Authorization: Bearer {{adminToken}}
@@ -246,3 +286,157 @@ Accept: application/json
 POST {{host}}/auth/logout
 Authorization: Bearer invalid_token
 Accept: application/json
+
+### =====================================
+### 9. OTP - GET
+### =====================================
+
+### Get OTP config as admin
+GET {{host}}/admin/otp-config
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+### Get OTP config as user
+GET {{host}}/admin/otp-config
+Authorization: Bearer {{userToken}}
+Accept: application/json
+
+### Get OTP config - no token
+GET {{host}}/admin/otp-config
+Accept: application/json
+
+### Get OTP config - bad auth format
+GET {{host}}/admin/otp-config
+Authorization: Token abc123
+Accept: application/json
+
+
+
+### =====================================
+### 10. OTP - UPDATE
+### =====================================
+
+### Update OTP config as admin
+PUT {{host}}/admin/otp-config
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "codeLength": 6,
+  "ttlSeconds": 300
+}
+
+### Update OTP config as user
+PUT {{host}}/admin/otp-config
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "codeLength": 6,
+  "ttlSeconds": 300
+}
+
+### Update OTP config - invalid codeLength
+PUT {{host}}/admin/otp-config
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "codeLength": 3,
+  "ttlSeconds": 300
+}
+
+### Update OTP config - invalid ttl
+PUT {{host}}/admin/otp-config
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "codeLength": 6,
+  "ttlSeconds": 0
+}
+
+### Update OTP config - missing codeLength
+PUT {{host}}/admin/otp-config
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "ttlSeconds": 300
+}
+
+### Update OTP config - missing ttlSeconds
+PUT {{host}}/admin/otp-config
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "codeLength": 6
+}
+
+
+### =====================================
+### 11. OTP - GENERATE
+### =====================================
+
+### Generate OTP as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-001",
+  "deliveryChannel": "FILE",
+  "deliveryTarget": "otp-codes.txt"
+}
+
+### Generate OTP as admin
+POST {{host}}/otp/generate
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "operationId": "admin-op-001",
+  "deliveryChannel": "FILE",
+  "deliveryTarget": "otp-codes.txt"
+}
+
+### Generate OTP - no token
+POST {{host}}/otp/generate
+Content-Type: application/json
+
+{
+  "operationId": "payment-002",
+  "deliveryChannel": "FILE",
+  "deliveryTarget": "otp-codes.txt"
+}
+
+### Generate OTP - missing operationId
+POST {{host}}/otp/generate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "deliveryChannel": "FILE",
+  "deliveryTarget": "otp-codes.txt"
+}
+
+### Generate OTP - missing deliveryChannel
+POST {{host}}/otp/generate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-003",
+  "deliveryTarget": "otp-codes.txt"
+}
+
+### Generate OTP - missing deliveryTarget
+POST {{host}}/otp/generate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-004",
+  "deliveryChannel": "FILE"
+}

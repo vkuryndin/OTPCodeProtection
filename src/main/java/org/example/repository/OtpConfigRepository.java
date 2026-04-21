@@ -1,6 +1,7 @@
 package org.example.repository;
 
 import org.example.model.OtpConfig;
+import org.springframework.stereotype.Repository;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -8,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 
+@Repository
 public class OtpConfigRepository {
 
     public OtpConfig getConfig() {

@@ -3,6 +3,7 @@ package org.example.repository;
 import org.example.model.DeliveryChannel;
 import org.example.model.OtpCode;
 import org.example.model.OtpStatus;
+import org.springframework.stereotype.Repository;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -11,6 +12,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
+@Repository
 public class OtpCodeRepository {
 
     public Long createOtpCode(OtpCode otpCode) {
