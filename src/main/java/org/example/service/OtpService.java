@@ -12,6 +12,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.example.model.DeliveryChannel;
 
 @Service
 public class OtpService {
@@ -19,11 +20,13 @@ public class OtpService {
     private final OtpConfigRepository otpConfigRepository;
     private final OtpCodeRepository otpCodeRepository;
     private final SecureRandom secureRandom = new SecureRandom();
+    private final FileDeliveryService fileDeliveryService;
 
     public OtpService(OtpConfigRepository otpConfigRepository,
-                      OtpCodeRepository otpCodeRepository) {
+                      OtpCodeRepository otpCodeRepository, FileDeliveryService fileDeliveryService) {
         this.otpConfigRepository = otpConfigRepository;
         this.otpCodeRepository = otpCodeRepository;
+        this.fileDeliveryService = fileDeliveryService;
     }
 
     public Map<String, Object> generateOtp(Long userId, GenerateOtpRequest request) {
@@ -47,8 +50,12 @@ public class OtpService {
         if (config == null) {
             throw new IllegalArgumentException("OTP config not found");
         }
+        if (request.getDeliveryChannel() != DeliveryChannel.FILE) {
+            throw new IllegalArgumentException("Delivery channel is not supported yet");
+        }
 
         LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiresAt = now.plusSeconds(config.getTtlSeconds());
         String code = generateNumericCode(config.getCodeLength());
 
         OtpCode otpCode = new OtpCode();
@@ -62,12 +69,17 @@ public class OtpService {
         otpCode.setSentAt(now);
 
         Long otpId = otpCodeRepository.createOtpCode(otpCode);
-
+        fileDeliveryService.saveOtpToFile(
+                otpCode.getDeliveryTarget(),
+                userId,
+                otpCode.getOperationId(),
+                code,
+                expiresAt
+        );
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("message", "OTP generated successfully");
         response.put("otpId", otpId);
         response.put("operationId", otpCode.getOperationId());
-        response.put("code", code);
         response.put("status", otpCode.getStatus());
         response.put("deliveryChannel", otpCode.getDeliveryChannel());
         response.put("deliveryTarget", otpCode.getDeliveryTarget());

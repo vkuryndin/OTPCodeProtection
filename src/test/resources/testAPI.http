@@ -1,11 +1,14 @@
 ### Base variables
 @host = http://localhost:8080
-@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3NDY2MywiZXhwIjoxNzc2Nzc4MjYzfQ.mQZrNmP67Cc4Q6IR-hZv71h8E81A7HmVH4z2CWEtRTRgINsATIe4mQQDHrv5D-RI
-@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI1IiwibG9naW4iOiJ1c2VyXzIiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc3NDY4MywiZXhwIjoxNzc2Nzc4MjgzfQ.Yeg_gyV3yYzriWWGrUysPwEJysqQ3-irkAOc-EpGhDe--1qSMK-HXx1P2XdDF-vy
+@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3NTg2OCwiZXhwIjoxNzc2Nzc5NDY4fQ.ifrzb4ldDb2gyjVv81kEuSTj3q3ajmbzQ2q03hFjafV9p2n6dcxOKAOYyI9AkY5o
+@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI1IiwibG9naW4iOiJ1c2VyXzIiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc3NTg4NCwiZXhwIjoxNzc2Nzc5NDg0fQ.Nvpg9KzqWrRcrHJjqWvNeBJTVRbkvskLduMcg8qmX_z7HWRwJa51sbnNAQwNk00C
 @userId = 5
+@otpFile = otp-codes.txt
+@otpCode = 731310
 
-
-### FAST
+### =====================================
+### 0. FAST LOGIN
+### =====================================
 
 ### Login as admin - valid
 POST {{host}}/auth/login
@@ -351,7 +354,7 @@ Content-Type: application/json
 
 {
   "codeLength": 6,
-  "ttlSeconds": 300
+  "ttlSeconds": 10
 }
 
 ### Update OTP config as user
@@ -477,8 +480,8 @@ Authorization: Bearer {{userToken}}
 Content-Type: application/json
 
 {
-  "operationId": "payment-001",
-  "code": "PASTE_CODE_HERE"
+  "operationId": "payment-file-001",
+  "code": "{{otpCode}}"
 }
 
 ### Validate OTP - wrong code
@@ -517,3 +520,50 @@ Content-Type: application/json
   "operationId": "payment-001",
   "code": "123456"
 }
+
+
+
+####
+
+### Generate OTP to file as admin
+POST {{host}}/otp/generate
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-file-001",
+  "deliveryChannel": "FILE",
+  "deliveryTarget": "{{otpFile}}"
+}
+
+
+### Generate OTP to file as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-file-001",
+  "deliveryChannel": "FILE",
+  "deliveryTarget": "{{otpFile}}"
+}
+### Generate OTP - unsupported channel
+POST {{host}}/otp/generate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-email-001",
+  "deliveryChannel": "EMAIL",
+  "deliveryTarget": "user@test.com"
+}
+### Validate OTP from file
+POST {{host}}/otp/validate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-file-001",
+  "code": "{{otpCode}}"
+}
+
