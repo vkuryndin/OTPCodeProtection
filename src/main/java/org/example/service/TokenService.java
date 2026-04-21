@@ -13,11 +13,15 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 @Service
 public class TokenService {
 
     private final SecretKey secretKey;
     private final long expirationMinutes;
+    private final Set<String> revokedTokens = ConcurrentHashMap.newKeySet(); //to disable operations after logout (in memory)
 
     public TokenService(
             @Value("${jwt.secret}") String secret,
@@ -51,6 +55,8 @@ public class TokenService {
         return claims.get("role", String.class);
     }
 
+    //before deleting toekns if logout
+    /*
     private Claims parseClaims(String token) {
         try {
             return Jwts.parser()
@@ -61,5 +67,27 @@ public class TokenService {
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid or expired token");
         }
+    }
+
+     */
+
+    private Claims parseClaims(String token) {
+        if (revokedTokens.contains(token)) {
+            throw new IllegalArgumentException("Invalid or expired token");
+        }
+
+        try {
+            return Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid or expired token");
+        }
+    }
+
+    public void revokeToken(String token) {
+        revokedTokens.add(token);
     }
 }

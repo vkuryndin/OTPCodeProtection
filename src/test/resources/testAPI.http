@@ -1,8 +1,31 @@
 ### Base variables
 @host = http://localhost:8080
-@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3MzA4MCwiZXhwIjoxNzc2Nzc2NjgwfQ.VGTx7zNo3MUoqsx0BzEQ64LvzlEjFjNqB39wJLSxhYVOv-mpgHxBaZxkhip6hFBs
-@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI1IiwibG9naW4iOiJ1c2VyXzIiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc3MzAxOCwiZXhwIjoxNzc2Nzc2NjE4fQ.x9No4k3Dg_U-jwAXnv2o-kT3LdSAOUBnagpq58lVKPtNeVfgn40k6_7voiJ3WBJD"
+@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3Mzc1NywiZXhwIjoxNzc2Nzc3MzU3fQ.aSHZXJWOf2iyzQRA09yrq7DgIFAUYvw48_1O4MGyEaMa7OrrOKGveZ8bBtYUuWU1
+@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI5IiwibG9naW4iOiJ1c2VyXzMiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc3Mzc4MSwiZXhwIjoxNzc2Nzc3MzgxfQ.qT0B6kv-NUmgqgEg0UWDQyEnEDjnOyFyMWW_JYHytogor9hE1iAyI1zmoaJS6k4l"
 @userId = 5
+
+
+### FAST
+
+### Login as admin - valid
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "12345678"
+}
+
+
+### Login as user - valid
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "user_2",
+  "password": "12345678"
+}
+
 
 ### =====================================
 ### 1. HEALTH
