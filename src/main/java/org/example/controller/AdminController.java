@@ -53,37 +53,7 @@ public class AdminController {
         return ResponseEntity.ok(users);
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("error", e.getMessage());
 
-        String message = e.getMessage();
-        if ("Authorization header is required".equals(message)
-                || "Invalid authorization format".equals(message)
-                || "Token is required".equals(message)
-                || "Invalid or expired token".equals(message)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-        }
-
-        if ("User not found".equals(message)
-                || "OTP config not found".equals(message)) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
-
-        if ("Admin cannot be deleted".equals(message)) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-
-        return ResponseEntity.badRequest().body(response);
-    }
-
-    @ExceptionHandler(SecurityException.class)
-    public ResponseEntity<Map<String, Object>> handleForbidden(SecurityException e) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("error", e.getMessage());
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-    }
     @DeleteMapping("/users/{id}")
     public ResponseEntity<Map<String, Object>> deleteUser(@PathVariable Long id,
                                                           HttpServletRequest request) {

@@ -40,28 +40,6 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("error", e.getMessage());
-
-        String message = e.getMessage();
-        if ("Authorization header is required".equals(message)
-                || "Invalid authorization format".equals(message)
-                || "Token is required".equals(message)
-                || "Invalid or expired token".equals(message)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-        }
-
-        return ResponseEntity.badRequest().body(response);
-    }
-    @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<Map<String, Object>> handleConflict(IllegalStateException e) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("error", e.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
-    }
-
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request) {
         User user = authService.authenticate(request.getLogin(), request.getPassword());

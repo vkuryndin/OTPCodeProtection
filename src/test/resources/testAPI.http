@@ -1,7 +1,7 @@
 ### Base variables
 @host = http://localhost:8080
-@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3Mzc1NywiZXhwIjoxNzc2Nzc3MzU3fQ.aSHZXJWOf2iyzQRA09yrq7DgIFAUYvw48_1O4MGyEaMa7OrrOKGveZ8bBtYUuWU1
-@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI5IiwibG9naW4iOiJ1c2VyXzMiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc3Mzc4MSwiZXhwIjoxNzc2Nzc3MzgxfQ.qT0B6kv-NUmgqgEg0UWDQyEnEDjnOyFyMWW_JYHytogor9hE1iAyI1zmoaJS6k4l"
+@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3NDY2MywiZXhwIjoxNzc2Nzc4MjYzfQ.mQZrNmP67Cc4Q6IR-hZv71h8E81A7HmVH4z2CWEtRTRgINsATIe4mQQDHrv5D-RI
+@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI1IiwibG9naW4iOiJ1c2VyXzIiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc3NDY4MywiZXhwIjoxNzc2Nzc4MjgzfQ.Yeg_gyV3yYzriWWGrUysPwEJysqQ3-irkAOc-EpGhDe--1qSMK-HXx1P2XdDF-vy
 @userId = 5
 
 
@@ -301,6 +301,11 @@ POST {{host}}/auth/logout
 Authorization: Bearer {{adminToken}}
 Accept: application/json
 
+### Logout (valid token)
+POST {{host}}/auth/logout
+Authorization: Bearer {{userToken}}
+Accept: application/json
+
 ### Logout - no token
 POST {{host}}/auth/logout
 Accept: application/json
@@ -462,4 +467,53 @@ Content-Type: application/json
 {
   "operationId": "payment-004",
   "deliveryChannel": "FILE"
+}
+
+### VALIDATE
+
+### Validate OTP as user
+POST {{host}}/otp/validate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-001",
+  "code": "PASTE_CODE_HERE"
+}
+
+### Validate OTP - wrong code
+POST {{host}}/otp/validate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-001",
+  "code": "000000"
+}
+
+### Validate OTP - missing operationId
+POST {{host}}/otp/validate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "code": "123456"
+}
+
+### Validate OTP - missing code
+POST {{host}}/otp/validate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-001"
+}
+
+### Validate OTP - no token
+POST {{host}}/otp/validate
+Content-Type: application/json
+
+{
+  "operationId": "payment-001",
+  "code": "123456"
 }

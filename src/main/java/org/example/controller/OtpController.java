@@ -7,6 +7,7 @@ import org.example.service.TokenService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.example.dto.ValidateOtpRequest;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -53,23 +54,14 @@ public class OtpController {
         return token;
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("error", e.getMessage());
 
-        String message = e.getMessage();
-        if ("Authorization header is required".equals(message)
-                || "Invalid authorization format".equals(message)
-                || "Token is required".equals(message)
-                || "Invalid or expired token".equals(message)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-        }
+    @PostMapping("/validate")
+    public ResponseEntity<Map<String, Object>> validateOtp(@RequestBody ValidateOtpRequest request,
+                                                           HttpServletRequest httpRequest) {
+        String token = extractToken(httpRequest);
+        Long userId = tokenService.extractUserId(token);
 
-        if ("OTP config not found".equals(message)) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
-
-        return ResponseEntity.badRequest().body(response);
+        Map<String, Object> response = otpService.validateOtp(userId, request);
+        return ResponseEntity.ok(response);
     }
 }

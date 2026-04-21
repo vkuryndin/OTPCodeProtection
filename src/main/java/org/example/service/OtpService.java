@@ -89,4 +89,44 @@ public class OtpService {
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
+
+    public Map<String, Object> validateOtp(Long userId, org.example.dto.ValidateOtpRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Request body is required");
+        }
+
+        if (isBlank(request.getOperationId())) {
+            throw new IllegalArgumentException("Operation ID is required");
+        }
+
+        if (isBlank(request.getCode())) {
+            throw new IllegalArgumentException("OTP code is required");
+        }
+
+        otpCodeRepository.expireActiveCodes();
+
+        OtpCode otpCode = otpCodeRepository.findActiveCode(
+                userId,
+                request.getOperationId().trim(),
+                request.getCode().trim()
+        );
+
+        if (otpCode == null) {
+            throw new IllegalArgumentException("Invalid or expired OTP code");
+        }
+
+        boolean updated = otpCodeRepository.markAsUsed(otpCode.getId());
+        if (!updated) {
+            throw new IllegalArgumentException("Invalid or expired OTP code");
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("message", "OTP validated successfully");
+        response.put("otpId", otpCode.getId());
+        response.put("operationId", otpCode.getOperationId());
+        response.put("status", OtpStatus.USED);
+
+        return response;
+    }
+
 }
