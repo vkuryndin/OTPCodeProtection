@@ -2,11 +2,13 @@ package org.example.repository;
 
 import org.example.model.Role;
 import org.example.model.User;
+import org.springframework.stereotype.Repository;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+@Repository
 public class UserRepository {
 
     public Long createUser(User user) {

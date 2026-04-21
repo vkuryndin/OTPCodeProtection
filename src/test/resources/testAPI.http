@@ -1,0 +1,191 @@
+### Base variables
+@host = http://localhost:8080
+
+### Health check
+GET {{host}}/health
+Accept: text/plain
+
+### Database health check
+GET {{host}}/health/db
+Accept: application/json
+
+### Register admin
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "123456",
+  "role": "ADMIN",
+  "email": "admin@test.com"
+}
+
+### Register user
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "user1",
+  "password": "123456",
+  "role": "USER",
+  "email": "user1@test.com",
+  "phone": "+37400112233",
+  "telegramChatId": "123456789"
+}
+
+### Login
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "123456"
+}
+
+### Register admin - valid
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "12345678",
+  "role": "ADMIN",
+  "email": "admin@test.com"
+}
+
+### Register user - valid
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "user_1",
+  "password": "12345678",
+  "role": "USER",
+  "email": "user1@test.com",
+  "phone": "+37400112233",
+  "telegramChatId": "123456789"
+}
+
+### Register - login is required
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "",
+  "password": "12345678",
+  "role": "USER"
+}
+
+### Register - login too short
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "ab",
+  "password": "12345678",
+  "role": "USER"
+}
+
+### Register - login invalid chars
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "user!*",
+  "password": "12345678",
+  "role": "USER"
+}
+
+### Register - password is required
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "user2",
+  "password": "",
+  "role": "USER"
+}
+
+### Register - password too short
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "user3",
+  "password": "1234567",
+  "role": "USER"
+}
+
+### Register - role is required
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "user4",
+  "password": "12345678"
+}
+
+### Register - duplicate login
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "12345678",
+  "role": "USER"
+}
+
+### Register - second admin
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "admin2",
+  "password": "12345678",
+  "role": "ADMIN"
+}
+
+### Login - valid
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "12345678"
+}
+
+### Login - login is required
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "",
+  "password": "12345678"
+}
+
+### Login - password is required
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": ""
+}
+
+### Login - wrong password
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "wrongpass123"
+}
+
+### Login - user not found
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "unknown_user",
+  "password": "12345678"
+}
