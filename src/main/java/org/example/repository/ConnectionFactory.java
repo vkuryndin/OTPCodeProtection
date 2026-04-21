@@ -1,4 +1,4 @@
-package org.example.dao;
+package org.example.repository;
 
 import org.example.config.DbConfig;
 
