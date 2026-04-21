@@ -17,12 +17,16 @@ import java.util.Map;
 import org.example.dto.UserResponse;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
 
     private final AuthService authService;
     private final TokenService tokenService;
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     public AuthController(AuthService authService, TokenService tokenService) {
         this.authService = authService;
@@ -73,8 +77,10 @@ public class AuthController {
             throw new IllegalArgumentException("Token is required");
         }
 
-        tokenService.extractUserId(token);
-        tokenService.revokeToken(token);   // revoke token (in memory)
+        Long userId = tokenService.extractUserId(token);
+        tokenService.revokeToken(token);
+
+        log.info("Logout successful: userId={}", userId);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("message", "Logout successful");

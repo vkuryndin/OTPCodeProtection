@@ -8,11 +8,15 @@ import org.example.security.PasswordHasher;
 import org.springframework.stereotype.Service;
 import org.example.util.AuthValidationUtil;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 public class AuthService {
     private final UserRepository userRepository;
     private final PasswordHasher passwordHasher;
     private final TokenService tokenService;
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     public AuthService(UserRepository userRepository, PasswordHasher passwordHasher, TokenService tokenService) {
         this.userRepository = userRepository;
@@ -39,7 +43,12 @@ public class AuthService {
         user.setPhone(emptyToNull(request.getPhone()));
         user.setTelegramChatId(emptyToNull(request.getTelegramChatId()));
 
-        return userRepository.createUser(user);
+        Long userId = userRepository.createUser(user);
+
+        log.info("User registered successfully: userId={}, login={}, role={}",
+                userId, user.getLogin(), user.getRole());
+
+        return userId;
     }
 
     private void validateRegisterRequest(RegisterRequest request) {
@@ -86,12 +95,45 @@ public class AuthService {
     }
 
     public String loginAndGenerateToken(String login, String password) {
-        User user = login(login, password);
-        return tokenService.generateToken(user);
+        User user = authenticate(login, password);
+        String token = tokenService.generateToken(user);
+
+        log.info("JWT token issued: userId={}, login={}", user.getId(), user.getLogin());
+
+        return token;
     }
 
     public User authenticate(String login, String password) {
-        return login(login, password);
+        String loginError = AuthValidationUtil.validateLogin(login);
+        if (loginError != null) {
+            log.warn("Authentication failed: invalid login format, login={}", login);
+            throw new IllegalArgumentException(loginError);
+        }
+
+        String passwordError = AuthValidationUtil.validatePassword(password);
+        if (passwordError != null) {
+            log.warn("Authentication failed: invalid password format, login={}", login);
+            throw new IllegalArgumentException(passwordError);
+        }
+
+        String normalizedLogin = login.trim();
+        User user = userRepository.findByLogin(normalizedLogin);
+
+        if (user == null) {
+            log.warn("Authentication failed: user not found, login={}", normalizedLogin);
+            throw new IllegalArgumentException("Invalid login or password");
+        }
+
+        if (!passwordHasher.matches(password, user.getPasswordHash())) {
+            log.warn("Authentication failed: wrong password, login={}, userId={}",
+                    normalizedLogin, user.getId());
+            throw new IllegalArgumentException("Invalid login or password");
+        }
+
+        log.info("Authentication successful: userId={}, login={}, role={}",
+                user.getId(), user.getLogin(), user.getRole());
+
+        return user;
     }
 
     private boolean isBlank(String value) {
