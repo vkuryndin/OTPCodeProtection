@@ -1,10 +1,10 @@
 ### Base variables
 @host = http://localhost:8080
 @adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3ODY5MywiZXhwIjoxNzc2NzgyMjkzfQ.flsry0Hwe21mS0fWGWO0_uQ6iJFYYK84YGphfyszDlbQMbsrXZYoEZh2T1fWjXBP
-@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxMSIsImxvZ2luIjoidXNlcl8yIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NzY3Nzg3MTIsImV4cCI6MTc3Njc4MjMxMn0.CVRstMrE-qvDu4QXLhJs9d54CVHUqp467Zgqm_D0Q86hfz7WqCZUGijtv7l8aCh-
+@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxMiIsImxvZ2luIjoidXNlcl81Iiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NzY3ODM1MjUsImV4cCI6MTc3Njc4NzEyNX0.eyY3da9yguq6maJrKYQftEYJdmvjQBhl6oUkWe-mAI3MHS4s8u_keZt4Y_kk4Yxr
 @userId = 5
 @otpFile = otp-codes.txt
-@otpCode = 552977
+@otpCode = 104183
 
 ### =====================================
 ### 0. FAST LOGIN
@@ -29,6 +29,22 @@ Content-Type: application/json
   "password": "12345678"
 }
 
+### Login as user - valid
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "user_5",
+  "password": "12345678"
+}
+### Login as user - valid
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "user_3",
+  "password": "12345678"
+}
 
 ### =====================================
 ### 1. HEALTH
@@ -93,6 +109,19 @@ Content-Type: application/json
   "password": "12345678",
   "role": "USER",
   "email": "v.kuryndin@proresearch.am",
+  "phone": "+37400112233",
+  "telegramChatId": "123456789"
+}
+
+### Register user - valid
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "user_5",
+  "password": "12345678",
+  "role": "USER",
+  "email": "tatiana.kuryndina@gmail.com",
   "phone": "+37400112233",
   "telegramChatId": "123456789"
 }
@@ -493,7 +522,7 @@ Authorization: Bearer {{userToken}}
 Content-Type: application/json
 
 {
-  "operationId": "payment-email-001",
+  "operationId": "payment-telegram-001",
   "code": "{{otpCode}}"
 }
 
@@ -616,3 +645,49 @@ Content-Type: application/json
   "operationId": "payment-email-001",
   "deliveryChannel": "EMAIL"
 }
+
+
+### Generate OTP to telegram as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-telegram-001",
+  "deliveryChannel": "TELEGRAM"
+}
+### Generate OTP to telegram as admin
+POST {{host}}/otp/generate
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-telegram-admin-001",
+  "deliveryChannel": "TELEGRAM"
+}
+
+
+### Start Telegram binding as user
+POST {{host}}/telegram/bind/start
+Authorization: Bearer {{userToken}}
+Accept: application/json
+
+### Start Telegram binding as admin
+POST {{host}}/telegram/bind/start
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+### Start Telegram binding - no token
+POST {{host}}/telegram/bind/start
+Accept: application/json
+
+
+### Start Telegram binding as user
+POST {{host}}/telegram/bind/start
+Authorization: Bearer {{userToken}}
+Accept: application/json
+
+### Complete Telegram binding as user
+POST {{host}}/telegram/bind/complete
+Authorization: Bearer {{userToken}}
+Accept: application/json

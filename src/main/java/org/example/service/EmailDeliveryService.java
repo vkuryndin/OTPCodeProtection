@@ -70,4 +70,25 @@ public class EmailDeliveryService {
             throw new RuntimeException("Failed to send email", e);
         }
     }
+    public void sendTelegramBindEmail(String toEmail, String bindLink, LocalDateTime expiresAt) {
+        if (toEmail == null || toEmail.trim().isEmpty()) {
+            throw new IllegalArgumentException("User email is not set");
+        }
+
+        try {
+            Message message = new MimeMessage(session);
+            message.setFrom(new InternetAddress(fromEmail));
+            message.setRecipient(Message.RecipientType.TO, new InternetAddress(toEmail.trim()));
+            message.setSubject("Bind your Telegram account");
+            message.setText(
+                    "To bind your Telegram account, open this link:\n"
+                            + bindLink + "\n\n"
+                            + "This link expires at: " + expiresAt
+            );
+
+            Transport.send(message);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to send email", e);
+        }
+    }
 }

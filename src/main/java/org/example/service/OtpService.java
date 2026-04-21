@@ -16,6 +16,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.example.model.DeliveryChannel;
 
+import org.example.model.DeliveryChannel;
+
 
 @Service
 public class OtpService {
@@ -26,16 +28,19 @@ public class OtpService {
     private final FileDeliveryService fileDeliveryService;
     private final EmailDeliveryService emailDeliveryService;
     private final UserRepository userRepository;
+    private final TelegramDeliveryService telegramDeliveryService;
 
     public OtpService(OtpConfigRepository otpConfigRepository,
                       OtpCodeRepository otpCodeRepository,
                       FileDeliveryService fileDeliveryService,
                       EmailDeliveryService emailDeliveryService,
+                      TelegramDeliveryService telegramDeliveryService,
                       UserRepository userRepository) {
         this.otpConfigRepository = otpConfigRepository;
         this.otpCodeRepository = otpCodeRepository;
         this.fileDeliveryService = fileDeliveryService;
         this.emailDeliveryService = emailDeliveryService;
+        this.telegramDeliveryService = telegramDeliveryService;
         this.userRepository = userRepository;
     }
 
@@ -63,7 +68,8 @@ public class OtpService {
         }
 
         if (request.getDeliveryChannel() != DeliveryChannel.FILE
-                && request.getDeliveryChannel() != DeliveryChannel.EMAIL) {
+                && request.getDeliveryChannel() != DeliveryChannel.EMAIL
+                && request.getDeliveryChannel() != DeliveryChannel.TELEGRAM) {
             throw new IllegalArgumentException("Delivery channel is not supported yet");
         }
 
@@ -78,11 +84,16 @@ public class OtpService {
                 throw new IllegalArgumentException("Delivery target is required");
             }
             actualTarget = request.getDeliveryTarget().trim();
-        } else {
+        } else if (request.getDeliveryChannel() == DeliveryChannel.EMAIL) {
             if (isBlank(user.getEmail())) {
                 throw new IllegalArgumentException("User email is not set");
             }
             actualTarget = user.getEmail().trim();
+        } else {
+            if (isBlank(user.getTelegramChatId())) {
+                throw new IllegalArgumentException("User telegram chat id is not set");
+            }
+            actualTarget = user.getTelegramChatId().trim();
         }
 
         OtpCode otpCode = new OtpCode();
@@ -107,6 +118,14 @@ public class OtpService {
             );
         } else if (request.getDeliveryChannel() == DeliveryChannel.EMAIL) {
             emailDeliveryService.sendOtpEmail(
+                    actualTarget,
+                    userId,
+                    otpCode.getOperationId(),
+                    code,
+                    expiresAt
+            );
+        } else if (request.getDeliveryChannel() == DeliveryChannel.TELEGRAM) {
+            telegramDeliveryService.sendOtpMessage(
                     actualTarget,
                     userId,
                     otpCode.getOperationId(),

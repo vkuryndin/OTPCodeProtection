@@ -11,6 +11,8 @@ public class User {
     private String phone;
     private String telegramChatId;
     private LocalDateTime createdAt;
+    private String telegramBindToken;
+    private LocalDateTime telegramBindExpiresAt;
 
     public User() {
     }
@@ -89,5 +91,21 @@ public class User {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getTelegramBindToken() {
+        return telegramBindToken;
+    }
+
+    public void setTelegramBindToken(String telegramBindToken) {
+        this.telegramBindToken = telegramBindToken;
+    }
+
+    public LocalDateTime getTelegramBindExpiresAt() {
+        return telegramBindExpiresAt;
+    }
+
+    public void setTelegramBindExpiresAt(LocalDateTime telegramBindExpiresAt) {
+        this.telegramBindExpiresAt = telegramBindExpiresAt;
     }
 }

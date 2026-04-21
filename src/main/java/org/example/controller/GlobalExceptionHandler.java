@@ -30,6 +30,18 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         }
 
+        if ("User email is not set".equals(message)
+                || "User telegram chat id is not set".equals(message)) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        if ("Telegram bind token is not set".equals(message)
+                || "Telegram bind token expired".equals(message)
+                || "Telegram chat id not found for bind token".equals(message)
+                || "User email is not set".equals(message)
+                || "User telegram chat id is not set".equals(message)) {
+            return ResponseEntity.badRequest().body(response);
+        }
+
         return ResponseEntity.badRequest().body(response);
     }
 

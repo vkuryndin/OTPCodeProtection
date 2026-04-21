@@ -5,6 +5,7 @@ import org.example.model.User;
 import org.springframework.stereotype.Repository;
 
 import java.sql.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,7 +43,7 @@ public class UserRepository {
 
     public User findByLogin(String login) {
         String sql = """
-                SELECT id, login, password_hash, role, email, phone, telegram_chat_id, created_at
+                SELECT id, login, password_hash, role, email, phone, telegram_chat_id, created_at, telegram_bind_token, telegram_bind_expires_at
                 FROM users
                 WHERE login = ?
                 """;
@@ -87,7 +88,7 @@ public class UserRepository {
 
     public List<User> findAllNonAdmins() {
         String sql = """
-                SELECT id, login, password_hash, role, email, phone, telegram_chat_id, created_at
+                SELECT id, login, password_hash, role, email, phone, telegram_chat_id, created_at, telegram_bind_token, telegram_bind_expires_at
                 FROM users
                 WHERE role <> 'ADMIN'
                 ORDER BY id
@@ -130,6 +131,12 @@ public class UserRepository {
         user.setEmail(rs.getString("email"));
         user.setPhone(rs.getString("phone"));
         user.setTelegramChatId(rs.getString("telegram_chat_id"));
+        user.setTelegramBindToken(rs.getString("telegram_bind_token"));
+
+        Timestamp telegramBindExpiresAt = rs.getTimestamp("telegram_bind_expires_at");
+        if (telegramBindExpiresAt != null) {
+            user.setTelegramBindExpiresAt(telegramBindExpiresAt.toLocalDateTime());
+        }
 
         Timestamp createdAt = rs.getTimestamp("created_at");
         if (createdAt != null) {
@@ -141,7 +148,7 @@ public class UserRepository {
 
     public User findById(Long id) {
         String sql = """
-            SELECT id, login, password_hash, role, email, phone, telegram_chat_id, created_at
+            SELECT id, login, password_hash, role, email, phone, telegram_chat_id, created_at, telegram_bind_token, telegram_bind_expires_at
             FROM users
             WHERE id = ?
             """;
@@ -159,6 +166,66 @@ public class UserRepository {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find user by id", e);
+        }
+    }
+    public void updateTelegramBindToken(Long userId, String bindToken, LocalDateTime expiresAt) {
+        String sql = """
+            UPDATE users
+            SET telegram_bind_token = ?, telegram_bind_expires_at = ?
+            WHERE id = ?
+            """;
+
+        try (Connection connection = ConnectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, bindToken);
+            statement.setTimestamp(2, Timestamp.valueOf(expiresAt));
+            statement.setLong(3, userId);
+
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update telegram bind token", e);
+        }
+    }
+    public User findByTelegramBindToken(String bindToken) {
+        String sql = """
+            SELECT id, login, password_hash, role, email, phone, telegram_chat_id,
+                   telegram_bind_token, telegram_bind_expires_at, created_at
+            FROM users
+            WHERE telegram_bind_token = ?
+            """;
+
+        try (Connection connection = ConnectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, bindToken);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                if (rs.next()) {
+                    return mapRow(rs);
+                }
+                return null;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find user by telegram bind token", e);
+        }
+    }
+    public void bindTelegramChatId(Long userId, String chatId) {
+        String sql = """
+            UPDATE users
+            SET telegram_chat_id = ?, telegram_bind_token = NULL, telegram_bind_expires_at = NULL
+            WHERE id = ?
+            """;
+
+        try (Connection connection = ConnectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, chatId);
+            statement.setLong(2, userId);
+
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to bind telegram chat id", e);
         }
     }
 }
