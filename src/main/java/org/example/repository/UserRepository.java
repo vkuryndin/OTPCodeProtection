@@ -138,4 +138,27 @@ public class UserRepository {
 
         return user;
     }
+
+    public User findById(Long id) {
+        String sql = """
+            SELECT id, login, password_hash, role, email, phone, telegram_chat_id, created_at
+            FROM users
+            WHERE id = ?
+            """;
+
+        try (Connection connection = ConnectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, id);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                if (rs.next()) {
+                    return mapRow(rs);
+                }
+                return null;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find user by id", e);
+        }
+    }
 }

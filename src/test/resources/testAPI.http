@@ -1,8 +1,8 @@
 ### Base variables
 @host = http://localhost:8080
-@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIzIiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc2NDM3MCwiZXhwIjoxNzc2NzY3OTcwfQ._Cbje0X6Wr4ns7BoAjQlO9d0lcILamVoB49aBvPh64HBBmB-4sOcCX7N-JI4g6Oa
-@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI0IiwibG9naW4iOiJ1c2VyXzEiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc2NDQyNSwiZXhwIjoxNzc2NzY4MDI1fQ.A_FnZBpmvmQHUsFBPekr2DqVfUUw5dHguIpbXMA-ZVXTuny1eJvGVlGxjUAZTpa5
-
+@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3MDMyNSwiZXhwIjoxNzc2NzcwMzg1fQ.eei9yo_oGSevIbh651JLRMXIHNZvb8HfqIYSUVhGFiSNqlKiwUtFd71ECL6Ws_Y4
+@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI1IiwibG9naW4iOiJ1c2VyXzIiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc3MDQxOCwiZXhwIjoxNzc2NzcwNDc4fQ.e5P2qbZWZlzHCXvvy0NAZe3n0XiS5j_rzGCH0_epUgC7YlsJnq6i474-TN3MfkFV
+@userId = 6
 ### =====================================
 ### 1. HEALTH
 ### =====================================
@@ -35,10 +35,10 @@ POST {{host}}/auth/register
 Content-Type: application/json
 
 {
-  "login": "user_1",
+  "login": "user_3",
   "password": "12345678",
   "role": "USER",
-  "email": "user1@test.com",
+  "email": "user2@test.com",
   "phone": "+37400112233",
   "telegramChatId": "123456789"
 }
@@ -148,7 +148,7 @@ POST {{host}}/auth/login
 Content-Type: application/json
 
 {
-  "login": "user_1",
+  "login": "user_2",
   "password": "12345678"
 }
 
@@ -209,4 +209,40 @@ Accept: application/json
 ### Get all non-admin users as normal user
 GET {{host}}/admin/users
 Authorization: Bearer {{userToken}}
+Accept: application/json
+
+
+### users delete test
+### Delete user as admin
+DELETE {{host}}/admin/users/{{userId}}
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+### Delete user as normal user
+DELETE {{host}}/admin/users/{{userId}}
+Authorization: Bearer {{userToken}}
+Accept: application/json
+
+### Delete user - no token
+DELETE {{host}}/admin/users/{{userId}}
+Accept: application/json
+
+### Delete user - not found
+DELETE {{host}}/admin/users/999999
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### Logout (valid token)
+POST {{host}}/auth/logout
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+### Logout - no token
+POST {{host}}/auth/logout
+Accept: application/json
+
+### Logout - invalid token
+POST {{host}}/auth/logout
+Authorization: Bearer invalid_token
 Accept: application/json

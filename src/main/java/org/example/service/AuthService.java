@@ -90,6 +90,10 @@ public class AuthService {
         return tokenService.generateToken(user);
     }
 
+    public User authenticate(String login, String password) {
+        return login(login, password);
+    }
+
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
