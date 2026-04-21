@@ -49,13 +49,11 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request) {
-        User user = authService.login(request.getLogin(), request.getPassword());
+        String token = authService.loginAndGenerateToken(request.getLogin(), request.getPassword());
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("message", "Login successful");
-        response.put("userId", user.getId());
-        response.put("login", user.getLogin());
-        response.put("role", user.getRole());
+        response.put("token", token);
 
         return ResponseEntity.ok(response);
     }

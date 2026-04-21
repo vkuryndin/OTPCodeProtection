@@ -1,5 +1,11 @@
 ### Base variables
 @host = http://localhost:8080
+@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIzIiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc2NDM3MCwiZXhwIjoxNzc2NzY3OTcwfQ._Cbje0X6Wr4ns7BoAjQlO9d0lcILamVoB49aBvPh64HBBmB-4sOcCX7N-JI4g6Oa
+@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI0IiwibG9naW4iOiJ1c2VyXzEiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc2NDQyNSwiZXhwIjoxNzc2NzY4MDI1fQ.A_FnZBpmvmQHUsFBPekr2DqVfUUw5dHguIpbXMA-ZVXTuny1eJvGVlGxjUAZTpa5
+
+### =====================================
+### 1. HEALTH
+### =====================================
 
 ### Health check
 GET {{host}}/health
@@ -9,38 +15,9 @@ Accept: text/plain
 GET {{host}}/health/db
 Accept: application/json
 
-### Register admin
-POST {{host}}/auth/register
-Content-Type: application/json
-
-{
-  "login": "admin",
-  "password": "123456",
-  "role": "ADMIN",
-  "email": "admin@test.com"
-}
-
-### Register user
-POST {{host}}/auth/register
-Content-Type: application/json
-
-{
-  "login": "user1",
-  "password": "123456",
-  "role": "USER",
-  "email": "user1@test.com",
-  "phone": "+37400112233",
-  "telegramChatId": "123456789"
-}
-
-### Login
-POST {{host}}/auth/login
-Content-Type: application/json
-
-{
-  "login": "admin",
-  "password": "123456"
-}
+### =====================================
+### 2. REGISTER - SUCCESS CASES
+### =====================================
 
 ### Register admin - valid
 POST {{host}}/auth/register
@@ -65,6 +42,10 @@ Content-Type: application/json
   "phone": "+37400112233",
   "telegramChatId": "123456789"
 }
+
+### =====================================
+### 3. REGISTER - VALIDATION ERRORS
+### =====================================
 
 ### Register - login is required
 POST {{host}}/auth/register
@@ -125,6 +106,10 @@ Content-Type: application/json
   "password": "12345678"
 }
 
+### =====================================
+### 4. REGISTER - BUSINESS RULE ERRORS
+### =====================================
+
 ### Register - duplicate login
 POST {{host}}/auth/register
 Content-Type: application/json
@@ -145,12 +130,25 @@ Content-Type: application/json
   "role": "ADMIN"
 }
 
-### Login - valid
+### =====================================
+### 5. LOGIN
+### =====================================
+
+### Login as admin - valid
 POST {{host}}/auth/login
 Content-Type: application/json
 
 {
   "login": "admin",
+  "password": "12345678"
+}
+
+### Login as user - valid
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "user_1",
   "password": "12345678"
 }
 
@@ -189,3 +187,26 @@ Content-Type: application/json
   "login": "unknown_user",
   "password": "12345678"
 }
+
+### =====================================
+### 6. ADMIN API - AUTHORIZATION CHECKS
+### =====================================
+
+### Get all non-admin users as admin
+GET {{host}}/admin/users
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+### Get all non-admin users - no token
+GET {{host}}/admin/users
+Accept: application/json
+
+### Get all non-admin users - invalid token format
+GET {{host}}/admin/users
+Authorization: Token abc123
+Accept: application/json
+
+### Get all non-admin users as normal user
+GET {{host}}/admin/users
+Authorization: Bearer {{userToken}}
+Accept: application/json

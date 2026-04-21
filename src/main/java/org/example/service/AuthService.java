@@ -12,10 +12,12 @@ import org.example.util.AuthValidationUtil;
 public class AuthService {
     private final UserRepository userRepository;
     private final PasswordHasher passwordHasher;
+    private final TokenService tokenService;
 
-    public AuthService(UserRepository userRepository, PasswordHasher passwordHasher) {
+    public AuthService(UserRepository userRepository, PasswordHasher passwordHasher, TokenService tokenService) {
         this.userRepository = userRepository;
         this.passwordHasher = passwordHasher;
+        this.tokenService = tokenService;
     }
 
     public Long register(RegisterRequest request) {
@@ -81,6 +83,11 @@ public class AuthService {
         }
 
         return user;
+    }
+
+    public String loginAndGenerateToken(String login, String password) {
+        User user = login(login, password);
+        return tokenService.generateToken(user);
     }
 
     private boolean isBlank(String value) {
