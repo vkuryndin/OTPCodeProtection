@@ -6,6 +6,8 @@ import org.example.model.OtpConfig;
 import org.example.model.OtpStatus;
 import org.example.repository.OtpCodeRepository;
 import org.example.repository.OtpConfigRepository;
+import org.example.repository.UserRepository;
+import org.example.model.User;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -14,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.example.model.DeliveryChannel;
 
+
 @Service
 public class OtpService {
 
@@ -21,12 +24,19 @@ public class OtpService {
     private final OtpCodeRepository otpCodeRepository;
     private final SecureRandom secureRandom = new SecureRandom();
     private final FileDeliveryService fileDeliveryService;
+    private final EmailDeliveryService emailDeliveryService;
+    private final UserRepository userRepository;
 
     public OtpService(OtpConfigRepository otpConfigRepository,
-                      OtpCodeRepository otpCodeRepository, FileDeliveryService fileDeliveryService) {
+                      OtpCodeRepository otpCodeRepository,
+                      FileDeliveryService fileDeliveryService,
+                      EmailDeliveryService emailDeliveryService,
+                      UserRepository userRepository) {
         this.otpConfigRepository = otpConfigRepository;
         this.otpCodeRepository = otpCodeRepository;
         this.fileDeliveryService = fileDeliveryService;
+        this.emailDeliveryService = emailDeliveryService;
+        this.userRepository = userRepository;
     }
 
     public Map<String, Object> generateOtp(Long userId, GenerateOtpRequest request) {
@@ -42,15 +52,18 @@ public class OtpService {
             throw new IllegalArgumentException("Delivery channel is required");
         }
 
-        if (isBlank(request.getDeliveryTarget())) {
-            throw new IllegalArgumentException("Delivery target is required");
+        User user = userRepository.findById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User not found");
         }
 
         OtpConfig config = otpConfigRepository.getConfig();
         if (config == null) {
             throw new IllegalArgumentException("OTP config not found");
         }
-        if (request.getDeliveryChannel() != DeliveryChannel.FILE) {
+
+        if (request.getDeliveryChannel() != DeliveryChannel.FILE
+                && request.getDeliveryChannel() != DeliveryChannel.EMAIL) {
             throw new IllegalArgumentException("Delivery channel is not supported yet");
         }
 
@@ -58,24 +71,50 @@ public class OtpService {
         LocalDateTime expiresAt = now.plusSeconds(config.getTtlSeconds());
         String code = generateNumericCode(config.getCodeLength());
 
+        String actualTarget;
+
+        if (request.getDeliveryChannel() == DeliveryChannel.FILE) {
+            if (isBlank(request.getDeliveryTarget())) {
+                throw new IllegalArgumentException("Delivery target is required");
+            }
+            actualTarget = request.getDeliveryTarget().trim();
+        } else {
+            if (isBlank(user.getEmail())) {
+                throw new IllegalArgumentException("User email is not set");
+            }
+            actualTarget = user.getEmail().trim();
+        }
+
         OtpCode otpCode = new OtpCode();
         otpCode.setUserId(userId);
         otpCode.setOperationId(request.getOperationId().trim());
         otpCode.setCode(code);
         otpCode.setStatus(OtpStatus.ACTIVE);
         otpCode.setDeliveryChannel(request.getDeliveryChannel());
-        otpCode.setDeliveryTarget(request.getDeliveryTarget().trim());
-        otpCode.setExpiresAt(now.plusSeconds(config.getTtlSeconds()));
+        otpCode.setDeliveryTarget(actualTarget);
+        otpCode.setExpiresAt(expiresAt);
         otpCode.setSentAt(now);
 
         Long otpId = otpCodeRepository.createOtpCode(otpCode);
-        fileDeliveryService.saveOtpToFile(
-                otpCode.getDeliveryTarget(),
-                userId,
-                otpCode.getOperationId(),
-                code,
-                expiresAt
-        );
+
+        if (request.getDeliveryChannel() == DeliveryChannel.FILE) {
+            fileDeliveryService.saveOtpToFile(
+                    actualTarget,
+                    userId,
+                    otpCode.getOperationId(),
+                    code,
+                    expiresAt
+            );
+        } else if (request.getDeliveryChannel() == DeliveryChannel.EMAIL) {
+            emailDeliveryService.sendOtpEmail(
+                    actualTarget,
+                    userId,
+                    otpCode.getOperationId(),
+                    code,
+                    expiresAt
+            );
+        }
+
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("message", "OTP generated successfully");
         response.put("otpId", otpId);

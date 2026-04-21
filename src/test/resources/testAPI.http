@@ -1,10 +1,10 @@
 ### Base variables
 @host = http://localhost:8080
-@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3NTg2OCwiZXhwIjoxNzc2Nzc5NDY4fQ.ifrzb4ldDb2gyjVv81kEuSTj3q3ajmbzQ2q03hFjafV9p2n6dcxOKAOYyI9AkY5o
-@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI1IiwibG9naW4iOiJ1c2VyXzIiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc3NTg4NCwiZXhwIjoxNzc2Nzc5NDg0fQ.Nvpg9KzqWrRcrHJjqWvNeBJTVRbkvskLduMcg8qmX_z7HWRwJa51sbnNAQwNk00C
+@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3ODY5MywiZXhwIjoxNzc2NzgyMjkzfQ.flsry0Hwe21mS0fWGWO0_uQ6iJFYYK84YGphfyszDlbQMbsrXZYoEZh2T1fWjXBP
+@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxMSIsImxvZ2luIjoidXNlcl8yIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NzY3Nzg3MTIsImV4cCI6MTc3Njc4MjMxMn0.CVRstMrE-qvDu4QXLhJs9d54CVHUqp467Zgqm_D0Q86hfz7WqCZUGijtv7l8aCh-
 @userId = 5
 @otpFile = otp-codes.txt
-@otpCode = 731310
+@otpCode = 552977
 
 ### =====================================
 ### 0. FAST LOGIN
@@ -80,6 +80,19 @@ Content-Type: application/json
   "password": "12345678",
   "role": "USER",
   "email": "user2@test.com",
+  "phone": "+37400112233",
+  "telegramChatId": "123456789"
+}
+
+### Register user - valid
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "user_2",
+  "password": "12345678",
+  "role": "USER",
+  "email": "v.kuryndin@proresearch.am",
   "phone": "+37400112233",
   "telegramChatId": "123456789"
 }
@@ -354,7 +367,7 @@ Content-Type: application/json
 
 {
   "codeLength": 6,
-  "ttlSeconds": 10
+  "ttlSeconds": 1000
 }
 
 ### Update OTP config as user
@@ -480,7 +493,7 @@ Authorization: Bearer {{userToken}}
 Content-Type: application/json
 
 {
-  "operationId": "payment-file-001",
+  "operationId": "payment-email-001",
   "code": "{{otpCode}}"
 }
 
@@ -567,3 +580,39 @@ Content-Type: application/json
   "code": "{{otpCode}}"
 }
 
+### test e-mail
+
+@emailTarget = YOUR_REAL_EMAIL
+
+### Generate OTP to email as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-email-001",
+  "deliveryChannel": "EMAIL",
+  "deliveryTarget": "{{emailTarget}}"
+}
+
+### Generate OTP to file as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-file-001",
+  "deliveryChannel": "FILE",
+  "deliveryTarget": "{{otpFile}}"
+}
+###
+
+### Generate OTP to email as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-email-001",
+  "deliveryChannel": "EMAIL"
+}
