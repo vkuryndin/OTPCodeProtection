@@ -63,6 +63,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleRuntime(RuntimeException e) {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("error", e.getMessage());
+
+        String message = e.getMessage();
+
+        if ("SMPP simulator is not available. Start the SMPP server and try again.".equals(message)
+                || (message != null && message.startsWith("Cannot connect to SMPP simulator"))) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+        }
+
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }

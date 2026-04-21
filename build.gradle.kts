@@ -31,6 +31,7 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
     implementation("org.eclipse.angus:angus-mail:2.0.5")
+    implementation("org.jsmpp:jsmpp:3.0.1")
 }
 
 tasks.test {

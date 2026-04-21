@@ -1,7 +1,7 @@
 ### Base variables
 @host = http://localhost:8080
-@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc3ODY5MywiZXhwIjoxNzc2NzgyMjkzfQ.flsry0Hwe21mS0fWGWO0_uQ6iJFYYK84YGphfyszDlbQMbsrXZYoEZh2T1fWjXBP
-@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxMiIsImxvZ2luIjoidXNlcl81Iiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NzY3ODM1MjUsImV4cCI6MTc3Njc4NzEyNX0.eyY3da9yguq6maJrKYQftEYJdmvjQBhl6oUkWe-mAI3MHS4s8u_keZt4Y_kk4Yxr
+@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc4NjY3NSwiZXhwIjoxNzc2NzkwMjc1fQ.f3TR2cW-zuf4x4_aPscWRYFTYtY7jwXMQJntVpcpXdjgSOLAqpsBu-N42pC1K-WO
+@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxMyIsImxvZ2luIjoidXNlcl82Iiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NzY3ODUwNzgsImV4cCI6MTc3Njc4ODY3OH0.hOiKj_qM-09M6vsjPbamG8idgmRlDFXxzmZAoMuEcx95z6-gWYDRoomAfJqdnz0z
 @userId = 5
 @otpFile = otp-codes.txt
 @otpCode = 104183
@@ -126,6 +126,18 @@ Content-Type: application/json
   "telegramChatId": "123456789"
 }
 
+### Register user - valid
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "user_6",
+  "password": "12345678",
+  "role": "USER",
+  "email": "polly.volkova.08@mail.ru",
+  "phone": "+37400112233",
+  "telegramChatId": "123456789"
+}
 ### =====================================
 ### 3. REGISTER - VALIDATION ERRORS
 ### =====================================
@@ -252,6 +264,16 @@ Content-Type: application/json
   "login": "user_4",
   "password": "12345678"
 }
+
+### Login as user - valid
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "user_6",
+  "password": "12345678"
+}
+
 
 ### Login - login is required
 POST {{host}}/auth/login
@@ -691,3 +713,24 @@ Accept: application/json
 POST {{host}}/telegram/bind/complete
 Authorization: Bearer {{userToken}}
 Accept: application/json
+
+
+
+### Generate OTP to SMS as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-sms-001",
+  "deliveryChannel": "SMS"
+}
+### Generate OTP to SMS as admin
+POST {{host}}/otp/generate
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-sms-admin-001",
+  "deliveryChannel": "SMS"
+}
