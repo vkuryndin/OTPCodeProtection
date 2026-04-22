@@ -15,6 +15,7 @@ import org.example.repository.OtpConfigRepository;
 import org.example.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -29,6 +30,7 @@ public class OtpService {
 
     private static final int MAX_INVALID_VALIDATION_ATTEMPTS = 5;
     private static final long VALIDATION_BLOCK_MINUTES = 5;
+    private static final long VALIDATION_ATTEMPT_RETENTION_MINUTES = 30;
 
     private final OtpConfigRepository otpConfigRepository;
     private final OtpCodeRepository otpCodeRepository;
@@ -77,6 +79,12 @@ public class OtpService {
         String deliveryTarget = resolveDeliveryTarget(userId, user, request);
 
         generateOtpRateLimitService.validateAndRegisterAttempt(userId);
+
+        int expiredPreviousCodes = otpCodeRepository.expireActiveCodesForUserOperation(userId, operationId);
+        if (expiredPreviousCodes > 0) {
+            log.info("Expired previous active OTP codes before new generation: userId={}, operationId={}, expiredCount={}",
+                    userId, operationId, expiredPreviousCodes);
+        }
 
         OtpCode otpCode = buildOtpCode(userId, operationId, channel, deliveryTarget, code, now, expiresAt);
         Long otpId = otpCodeRepository.createOtpCode(otpCode);
@@ -335,14 +343,15 @@ public class OtpService {
 
         LocalDateTime now = LocalDateTime.now();
 
+        if (state.shouldRemove(now)) {
+            failedValidationAttempts.remove(key);
+            return;
+        }
+
         if (state.blockedUntil != null && state.blockedUntil.isAfter(now)) {
             log.warn("OTP validation blocked: userId={}, operationId={}, blockedUntil={}",
                     userId, operationId, state.blockedUntil);
             throw new IllegalArgumentException("Too many invalid OTP attempts. Try again later.");
-        }
-
-        if (state.blockedUntil != null && !state.blockedUntil.isAfter(now)) {
-            failedValidationAttempts.remove(key);
         }
     }
 
@@ -351,6 +360,13 @@ public class OtpService {
         ValidationAttemptState state = failedValidationAttempts.computeIfAbsent(key, ignored -> new ValidationAttemptState());
 
         LocalDateTime now = LocalDateTime.now();
+
+        if (state.shouldRemove(now)) {
+            state.failedAttempts = 0;
+            state.blockedUntil = null;
+        }
+
+        state.lastAttemptAt = now;
 
         if (state.blockedUntil != null && state.blockedUntil.isAfter(now)) {
             return;
@@ -370,6 +386,19 @@ public class OtpService {
         failedValidationAttempts.remove(validationAttemptKey(userId, operationId));
     }
 
+    @Scheduled(fixedDelayString = "${otp.validation-attempt-cleanup.fixed-delay-ms:600000}")
+    public synchronized void cleanupStaleValidationAttempts() {
+        LocalDateTime now = LocalDateTime.now();
+        int before = failedValidationAttempts.size();
+
+        failedValidationAttempts.entrySet().removeIf(entry -> entry.getValue().shouldRemove(now));
+
+        int removed = before - failedValidationAttempts.size();
+        if (removed > 0) {
+            log.debug("Removed stale OTP validation attempt entries: removed={}", removed);
+        }
+    }
+
     private String validationAttemptKey(Long userId, String operationId) {
         return userId + ":" + operationId;
     }
@@ -377,5 +406,14 @@ public class OtpService {
     private static final class ValidationAttemptState {
         private int failedAttempts;
         private LocalDateTime blockedUntil;
+        private LocalDateTime lastAttemptAt;
+
+        private boolean shouldRemove(LocalDateTime now) {
+            if (lastAttemptAt == null) {
+                return true;
+            }
+
+            return !lastAttemptAt.plusMinutes(VALIDATION_ATTEMPT_RETENTION_MINUTES).isAfter(now);
+        }
     }
 }

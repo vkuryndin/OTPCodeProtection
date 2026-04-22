@@ -4,6 +4,7 @@ import org.example.exception.RateLimitExceededException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -53,6 +54,24 @@ public class GenerateOtpRateLimitService {
         }
 
         window.attempts++;
+    }
+
+    @Scheduled(fixedDelayString = "${otp.generate-rate-limit.cleanup.fixed-delay-ms:600000}")
+    public void cleanupExpiredWindows() {
+        if (!enabled) {
+            attemptsByUserId.clear();
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        int before = attemptsByUserId.size();
+
+        attemptsByUserId.entrySet().removeIf(entry -> entry.getValue().isExpired(now, windowSeconds));
+
+        int removed = before - attemptsByUserId.size();
+        if (removed > 0) {
+            log.debug("Removed expired generate OTP rate limit windows: removed={}", removed);
+        }
     }
 
     private static final class AttemptWindow {

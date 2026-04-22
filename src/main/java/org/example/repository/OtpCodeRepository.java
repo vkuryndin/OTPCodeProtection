@@ -67,6 +67,14 @@ public class OtpCodeRepository {
               AND expires_at < CURRENT_TIMESTAMP
             """;
 
+    private static final String EXPIRE_ACTIVE_CODES_FOR_USER_OPERATION_SQL = """
+            UPDATE otp_codes
+            SET status = 'EXPIRED'
+            WHERE user_id = ?
+              AND operation_id = ?
+              AND status = 'ACTIVE'
+            """;
+
     private static final String DELETE_BY_ID_SQL = """
             DELETE FROM otp_codes
             WHERE id = ?
@@ -128,6 +136,18 @@ public class OtpCodeRepository {
             return statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to expire OTP codes", e);
+        }
+    }
+
+    public int expireActiveCodesForUserOperation(Long userId, String operationId) {
+        try (Connection connection = ConnectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(EXPIRE_ACTIVE_CODES_FOR_USER_OPERATION_SQL)) {
+
+            statement.setLong(1, userId);
+            statement.setString(2, operationId);
+            return statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to expire active OTP codes for user and operation", e);
         }
     }
 
