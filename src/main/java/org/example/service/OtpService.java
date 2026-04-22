@@ -72,8 +72,7 @@ public class OtpService {
         try {
             deliverOtp(otpId, userId, otpCode, code, expiresAt);
         } catch (RuntimeException e) {
-            log.error("OTP delivery failed: otpId={}, userId={}, operationId={}, channel={}, error={}",
-                    otpId, userId, otpCode.getOperationId(), otpCode.getDeliveryChannel(), e.getMessage());
+            cleanupFailedDeliveryOtp(otpId, userId, otpCode, e);
             throw e;
         }
 
@@ -208,6 +207,29 @@ public class OtpService {
         return otpCode;
     }
 
+    private void cleanupFailedDeliveryOtp(Long otpId,
+                                          Long userId,
+                                          OtpCode otpCode,
+                                          RuntimeException originalError) {
+        log.error("OTP delivery failed: otpId={}, userId={}, operationId={}, channel={}, error={}",
+                otpId, userId, otpCode.getOperationId(), otpCode.getDeliveryChannel(), originalError.getMessage());
+
+        try {
+            boolean deleted = otpCodeRepository.deleteById(otpId);
+
+            if (deleted) {
+                log.info("OTP removed after failed delivery: otpId={}, userId={}, operationId={}, channel={}",
+                        otpId, userId, otpCode.getOperationId(), otpCode.getDeliveryChannel());
+            } else {
+                log.warn("Failed to remove OTP after delivery error: otpId={}, userId={}, operationId={}, channel={}",
+                        otpId, userId, otpCode.getOperationId(), otpCode.getDeliveryChannel());
+            }
+        } catch (RuntimeException cleanupError) {
+            log.error("OTP cleanup failed after delivery error: otpId={}, userId={}, operationId={}, channel={}",
+                    otpId, userId, otpCode.getOperationId(), otpCode.getDeliveryChannel(), cleanupError);
+        }
+    }
+
     private String generateNumericCode(int length) {
         StringBuilder code = new StringBuilder(length);
 
@@ -300,12 +322,6 @@ public class OtpService {
                     throw new IllegalArgumentException("User phone is not set");
                 }
                 yield user.getPhone().trim();
-            }
-
-            default -> {
-                log.warn("OTP generation failed: unsupported delivery channel, userId={}, operationId={}, channel={}",
-                        userId, request.getOperationId(), request.getDeliveryChannel());
-                throw new IllegalArgumentException("Delivery channel is not supported yet");
             }
         };
     }

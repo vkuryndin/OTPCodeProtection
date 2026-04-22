@@ -16,11 +16,6 @@ import java.util.List;
 @Repository
 public class UserRepository {
 
-    private static final String USER_COLUMNS = """
-            id, login, password_hash, role, email, phone, telegram_chat_id,
-            created_at, telegram_bind_token, telegram_bind_expires_at
-            """;
-
     private static final String CREATE_USER_SQL = """
             INSERT INTO users (login, password_hash, role, email, phone, telegram_chat_id)
             VALUES (?, ?, ?::user_role, ?, ?, ?)
@@ -191,23 +186,6 @@ public class UserRepository {
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update telegram bind token", e);
-        }
-    }
-
-    public User findByTelegramBindToken(String bindToken) {
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(FIND_BY_TELEGRAM_BIND_TOKEN_SQL)) {
-
-            statement.setString(1, bindToken);
-
-            try (ResultSet rs = statement.executeQuery()) {
-                if (!rs.next()) {
-                    return null;
-                }
-                return mapRow(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to find user by telegram bind token", e);
         }
     }
 

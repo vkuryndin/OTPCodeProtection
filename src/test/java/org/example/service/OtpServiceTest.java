@@ -403,6 +403,61 @@ class OtpServiceTest {
         verify(otpCodeRepository).findActiveCode(userId, "payment-validate-003", "654321");
         verify(otpCodeRepository).markAsUsed(300L);
     }
+    @Test
+    void generateOtp_shouldDeleteCreatedOtp_whenDeliveryFails() {
+        Long userId = 30L;
+
+        User user = new User();
+        user.setId(userId);
+        user.setLogin("user_delivery_fail");
+        user.setRole(Role.USER);
+        user.setEmail("user_delivery_fail@test.com");
+        user.setPhone("+37400112233");
+        user.setTelegramChatId("123456789");
+
+        OtpConfig config = new OtpConfig();
+        config.setId(1);
+        config.setCodeLength(6);
+        config.setTtlSeconds(300);
+
+        GenerateOtpRequest request = new GenerateOtpRequest();
+        request.setOperationId("payment-file-fail-001");
+        request.setDeliveryChannel(DeliveryChannel.FILE);
+        request.setDeliveryTarget("otp-fail.txt");
+
+        when(userRepository.findById(userId)).thenReturn(user);
+        when(otpConfigRepository.getConfig()).thenReturn(config);
+        when(otpCodeRepository.createOtpCode(any(OtpCode.class))).thenReturn(555L);
+
+        doThrow(new RuntimeException("File delivery failed"))
+                .when(fileDeliveryService)
+                .saveOtpToFile(
+                        eq("otp-fail.txt"),
+                        eq(userId),
+                        eq("payment-file-fail-001"),
+                        anyString(),
+                        any(LocalDateTime.class)
+                );
+
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> otpService.generateOtp(userId, request)
+        );
+
+        assertEquals("File delivery failed", exception.getMessage());
+
+        verify(otpCodeRepository).createOtpCode(any(OtpCode.class));
+        verify(fileDeliveryService).saveOtpToFile(
+                eq("otp-fail.txt"),
+                eq(userId),
+                eq("payment-file-fail-001"),
+                anyString(),
+                any(LocalDateTime.class)
+        );
+        verify(otpCodeRepository).deleteById(555L);
+
+        verifyNoInteractions(emailDeliveryService, telegramDeliveryService, smsDeliveryService);
+    }
 
     private Object readProperty(Object target, String propertyName) {
         try {

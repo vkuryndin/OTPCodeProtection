@@ -57,6 +57,11 @@ public class OtpCodeRepository {
               AND expires_at < CURRENT_TIMESTAMP
             """;
 
+    private static final String DELETE_BY_ID_SQL = """
+            DELETE FROM otp_codes
+            WHERE id = ?
+            """;
+
     public Long createOtpCode(OtpCode otpCode) {
         try (Connection connection = ConnectionFactory.getConnection();
              PreparedStatement statement = connection.prepareStatement(CREATE_OTP_CODE_SQL)) {
@@ -68,7 +73,12 @@ public class OtpCodeRepository {
             statement.setString(5, otpCode.getDeliveryChannel().name());
             statement.setString(6, otpCode.getDeliveryTarget());
             statement.setTimestamp(7, Timestamp.valueOf(otpCode.getExpiresAt()));
-            setNullableTimestamp(statement, 8, otpCode.getSentAt());
+
+            if (otpCode.getSentAt() == null) {
+                statement.setTimestamp(8, null);
+            } else {
+                statement.setTimestamp(8, Timestamp.valueOf(otpCode.getSentAt()));
+            }
 
             try (ResultSet rs = statement.executeQuery()) {
                 if (rs.next()) {
@@ -122,6 +132,17 @@ public class OtpCodeRepository {
         }
     }
 
+    public boolean deleteById(Long otpCodeId) {
+        try (Connection connection = ConnectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(DELETE_BY_ID_SQL)) {
+
+            statement.setLong(1, otpCodeId);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to delete OTP code", e);
+        }
+    }
+
     private OtpCode mapRow(ResultSet rs) throws SQLException {
         OtpCode otpCode = new OtpCode();
         otpCode.setId(rs.getLong("id"));
@@ -136,14 +157,6 @@ public class OtpCodeRepository {
         otpCode.setSentAt(toLocalDateTime(rs.getTimestamp("sent_at")));
         otpCode.setUsedAt(toLocalDateTime(rs.getTimestamp("used_at")));
         return otpCode;
-    }
-
-    private void setNullableTimestamp(PreparedStatement statement, int index, LocalDateTime value) throws SQLException {
-        if (value == null) {
-            statement.setTimestamp(index, null);
-            return;
-        }
-        statement.setTimestamp(index, Timestamp.valueOf(value));
     }
 
     private LocalDateTime toLocalDateTime(Timestamp timestamp) {

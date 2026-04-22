@@ -25,8 +25,6 @@ class AuthServiceTest {
     @Mock
     private PasswordHasher passwordHasher;
 
-    @Mock
-    private TokenService tokenService;
 
     @InjectMocks
     private AuthService authService;

@@ -54,15 +54,6 @@ public class AuthService {
         return authenticate(login, password);
     }
 
-    public String loginAndGenerateToken(String login, String password) {
-        User user = authenticate(login, password);
-        String token = tokenService.generateToken(user);
-
-        log.info("JWT token issued: userId={}, login={}", user.getId(), user.getLogin());
-
-        return token;
-    }
-
     public User authenticate(String login, String password) {
         String normalizedLogin = validateCredentialsForAuthentication(login, password);
 
