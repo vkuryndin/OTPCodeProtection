@@ -13,26 +13,26 @@ import org.example.model.User;
 import org.example.repository.OtpCodeRepository;
 import org.example.repository.OtpConfigRepository;
 import org.example.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Service
 public class OtpService {
 
+    private static final Logger log = LoggerFactory.getLogger(OtpService.class);
+
     private final OtpConfigRepository otpConfigRepository;
     private final OtpCodeRepository otpCodeRepository;
-    private final SecureRandom secureRandom = new SecureRandom();
     private final FileDeliveryService fileDeliveryService;
     private final EmailDeliveryService emailDeliveryService;
     private final UserRepository userRepository;
     private final TelegramDeliveryService telegramDeliveryService;
     private final SmsDeliveryService smsDeliveryService;
-    private static final Logger log = LoggerFactory.getLogger(OtpService.class);
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public OtpService(OtpConfigRepository otpConfigRepository,
                       OtpCodeRepository otpCodeRepository,
@@ -51,59 +51,22 @@ public class OtpService {
     }
 
     public OtpGenerationResponse generateOtp(Long userId, GenerateOtpRequest request) {
-        if (request == null) {
-            log.warn("OTP generation failed: request body is missing, userId={}", userId);
-            throw new IllegalArgumentException("Request body is required");
-        }
+        validateGenerateRequest(userId, request);
 
-        if (request.getOperationId() == null || request.getOperationId().isBlank()) {
-            log.warn("OTP generation failed: operationId is missing, userId={}", userId);
-            throw new IllegalArgumentException("Operation ID is required");
-        }
+        String operationId = request.getOperationId().trim();
+        DeliveryChannel channel = request.getDeliveryChannel();
 
-        if (request.getDeliveryChannel() == null) {
-            log.warn("OTP generation failed: delivery channel is missing, userId={}, operationId={}",
-                    userId, request.getOperationId());
-            throw new IllegalArgumentException("Delivery channel is required");
-        }
+        User user = requireUser(userId);
+        OtpConfig config = requireOtpConfig(userId);
 
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            log.warn("OTP generation failed: user not found, userId={}", userId);
-            throw new IllegalArgumentException("User not found");
-        }
-
-        OtpConfig config = otpConfigRepository.getConfig();
-        if (config == null) {
-            log.error("OTP generation failed: OTP config not found, userId={}", userId);
-            throw new NotFoundException("OTP config not found");
-        }
-
-        if (request.getDeliveryChannel() != DeliveryChannel.FILE
-                && request.getDeliveryChannel() != DeliveryChannel.EMAIL
-                && request.getDeliveryChannel() != DeliveryChannel.TELEGRAM
-                && request.getDeliveryChannel() != DeliveryChannel.SMS) {
-            log.warn("OTP generation failed: unsupported delivery channel, userId={}, operationId={}, channel={}",
-                    userId, request.getOperationId(), request.getDeliveryChannel());
-            throw new IllegalArgumentException("Delivery channel is not supported yet");
-        }
+        ensureSupportedChannel(userId, operationId, channel);
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime expiresAt = now.plusSeconds(config.getTtlSeconds());
         String code = generateNumericCode(config.getCodeLength());
+        String deliveryTarget = resolveDeliveryTarget(userId, user, request);
 
-        String actualTarget = resolveDeliveryTarget(userId, user, request);
-
-        OtpCode otpCode = new OtpCode();
-        otpCode.setUserId(userId);
-        otpCode.setOperationId(request.getOperationId().trim());
-        otpCode.setCode(code);
-        otpCode.setStatus(OtpStatus.ACTIVE);
-        otpCode.setDeliveryChannel(request.getDeliveryChannel());
-        otpCode.setDeliveryTarget(actualTarget);
-        otpCode.setExpiresAt(expiresAt);
-        otpCode.setSentAt(now);
-
+        OtpCode otpCode = buildOtpCode(userId, operationId, channel, deliveryTarget, code, now, expiresAt);
         Long otpId = otpCodeRepository.createOtpCode(otpCode);
 
         try {
@@ -129,30 +92,14 @@ public class OtpService {
     }
 
     public OtpValidationResponse validateOtp(Long userId, ValidateOtpRequest request) {
-        if (request == null) {
-            log.warn("OTP validation failed: request body is missing, userId={}", userId);
-            throw new IllegalArgumentException("Request body is required");
-        }
+        validateValidateRequest(userId, request);
 
-        if (request.getOperationId() == null || request.getOperationId().isBlank()) {
-            log.warn("OTP validation failed: operationId is missing, userId={}", userId);
-            throw new IllegalArgumentException("Operation ID is required");
-        }
-
-        if (request.getCode() == null || request.getCode().isBlank()) {
-            log.warn("OTP validation failed: OTP code is missing, userId={}, operationId={}",
-                    userId, request.getOperationId());
-            throw new IllegalArgumentException("OTP code is required");
-        }
+        String operationId = request.getOperationId().trim();
+        String code = request.getCode().trim();
 
         otpCodeRepository.expireActiveCodes();
 
-        OtpCode otpCode = otpCodeRepository.findActiveCode(
-                userId,
-                request.getOperationId().trim(),
-                request.getCode().trim()
-        );
-
+        OtpCode otpCode = otpCodeRepository.findActiveCode(userId, operationId, code);
         if (otpCode == null) {
             log.warn("OTP validation failed: invalid or expired code, userId={}, operationId={}",
                     userId, request.getOperationId());
@@ -177,8 +124,92 @@ public class OtpService {
         );
     }
 
+    private void validateGenerateRequest(Long userId, GenerateOtpRequest request) {
+        if (request == null) {
+            log.warn("OTP generation failed: request body is missing, userId={}", userId);
+            throw new IllegalArgumentException("Request body is required");
+        }
+
+        if (request.getOperationId() == null || request.getOperationId().isBlank()) {
+            log.warn("OTP generation failed: operationId is missing, userId={}", userId);
+            throw new IllegalArgumentException("Operation ID is required");
+        }
+
+        if (request.getDeliveryChannel() == null) {
+            log.warn("OTP generation failed: delivery channel is missing, userId={}, operationId={}",
+                    userId, request.getOperationId());
+            throw new IllegalArgumentException("Delivery channel is required");
+        }
+    }
+
+    private void validateValidateRequest(Long userId, ValidateOtpRequest request) {
+        if (request == null) {
+            log.warn("OTP validation failed: request body is missing, userId={}", userId);
+            throw new IllegalArgumentException("Request body is required");
+        }
+
+        if (request.getOperationId() == null || request.getOperationId().isBlank()) {
+            log.warn("OTP validation failed: operationId is missing, userId={}", userId);
+            throw new IllegalArgumentException("Operation ID is required");
+        }
+
+        if (request.getCode() == null || request.getCode().isBlank()) {
+            log.warn("OTP validation failed: OTP code is missing, userId={}, operationId={}",
+                    userId, request.getOperationId());
+            throw new IllegalArgumentException("OTP code is required");
+        }
+    }
+
+    private User requireUser(Long userId) {
+        User user = userRepository.findById(userId);
+        if (user == null) {
+            log.warn("OTP generation failed: user not found, userId={}", userId);
+            throw new IllegalArgumentException("User not found");
+        }
+        return user;
+    }
+
+    private OtpConfig requireOtpConfig(Long userId) {
+        OtpConfig config = otpConfigRepository.getConfig();
+        if (config == null) {
+            log.error("OTP generation failed: OTP config not found, userId={}", userId);
+            throw new NotFoundException("OTP config not found");
+        }
+        return config;
+    }
+
+    private void ensureSupportedChannel(Long userId, String operationId, DeliveryChannel channel) {
+        if (channel != DeliveryChannel.FILE
+                && channel != DeliveryChannel.EMAIL
+                && channel != DeliveryChannel.TELEGRAM
+                && channel != DeliveryChannel.SMS) {
+            log.warn("OTP generation failed: unsupported delivery channel, userId={}, operationId={}, channel={}",
+                    userId, operationId, channel);
+            throw new IllegalArgumentException("Delivery channel is not supported yet");
+        }
+    }
+
+    private OtpCode buildOtpCode(Long userId,
+                                 String operationId,
+                                 DeliveryChannel deliveryChannel,
+                                 String deliveryTarget,
+                                 String code,
+                                 LocalDateTime sentAt,
+                                 LocalDateTime expiresAt) {
+        OtpCode otpCode = new OtpCode();
+        otpCode.setUserId(userId);
+        otpCode.setOperationId(operationId);
+        otpCode.setCode(code);
+        otpCode.setStatus(OtpStatus.ACTIVE);
+        otpCode.setDeliveryChannel(deliveryChannel);
+        otpCode.setDeliveryTarget(deliveryTarget);
+        otpCode.setExpiresAt(expiresAt);
+        otpCode.setSentAt(sentAt);
+        return otpCode;
+    }
+
     private String generateNumericCode(int length) {
-        StringBuilder code = new StringBuilder();
+        StringBuilder code = new StringBuilder(length);
 
         for (int i = 0; i < length; i++) {
             code.append(secureRandom.nextInt(10));

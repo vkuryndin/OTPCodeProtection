@@ -15,24 +15,51 @@ import java.time.LocalDateTime;
 @Repository
 public class OtpCodeRepository {
 
-    public Long createOtpCode(OtpCode otpCode) {
-        String sql = """
-                INSERT INTO otp_codes (
-                    user_id,
-                    operation_id,
-                    code,
-                    status,
-                    delivery_channel,
-                    delivery_target,
-                    expires_at,
-                    sent_at
-                )
-                VALUES (?, ?, ?, ?::otp_status, ?::delivery_channel, ?, ?, ?)
-                RETURNING id
-                """;
+    private static final String CREATE_OTP_CODE_SQL = """
+            INSERT INTO otp_codes (
+                user_id,
+                operation_id,
+                code,
+                status,
+                delivery_channel,
+                delivery_target,
+                expires_at,
+                sent_at
+            )
+            VALUES (?, ?, ?, ?::otp_status, ?::delivery_channel, ?, ?, ?)
+            RETURNING id
+            """;
 
+    private static final String FIND_ACTIVE_CODE_SQL = """
+            SELECT id, user_id, operation_id, code, status, delivery_channel, delivery_target,
+                   created_at, expires_at, sent_at, used_at
+            FROM otp_codes
+            WHERE user_id = ?
+              AND operation_id = ?
+              AND code = ?
+              AND status = 'ACTIVE'
+            ORDER BY id DESC
+            LIMIT 1
+            """;
+
+    private static final String MARK_AS_USED_SQL = """
+            UPDATE otp_codes
+            SET status = 'USED',
+                used_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND status = 'ACTIVE'
+            """;
+
+    private static final String EXPIRE_ACTIVE_CODES_SQL = """
+            UPDATE otp_codes
+            SET status = 'EXPIRED'
+            WHERE status = 'ACTIVE'
+              AND expires_at < CURRENT_TIMESTAMP
+            """;
+
+    public Long createOtpCode(OtpCode otpCode) {
         try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement = connection.prepareStatement(CREATE_OTP_CODE_SQL)) {
 
             statement.setLong(1, otpCode.getUserId());
             statement.setString(2, otpCode.getOperationId());
@@ -41,12 +68,7 @@ public class OtpCodeRepository {
             statement.setString(5, otpCode.getDeliveryChannel().name());
             statement.setString(6, otpCode.getDeliveryTarget());
             statement.setTimestamp(7, Timestamp.valueOf(otpCode.getExpiresAt()));
-
-            if (otpCode.getSentAt() != null) {
-                statement.setTimestamp(8, Timestamp.valueOf(otpCode.getSentAt()));
-            } else {
-                statement.setTimestamp(8, null);
-            }
+            setNullableTimestamp(statement, 8, otpCode.getSentAt());
 
             try (ResultSet rs = statement.executeQuery()) {
                 if (rs.next()) {
@@ -61,30 +83,18 @@ public class OtpCodeRepository {
     }
 
     public OtpCode findActiveCode(Long userId, String operationId, String code) {
-        String sql = """
-                SELECT id, user_id, operation_id, code, status, delivery_channel, delivery_target,
-                       created_at, expires_at, sent_at, used_at
-                FROM otp_codes
-                WHERE user_id = ?
-                  AND operation_id = ?
-                  AND code = ?
-                  AND status = 'ACTIVE'
-                ORDER BY id DESC
-                LIMIT 1
-                """;
-
         try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement = connection.prepareStatement(FIND_ACTIVE_CODE_SQL)) {
 
             statement.setLong(1, userId);
             statement.setString(2, operationId);
             statement.setString(3, code);
 
             try (ResultSet rs = statement.executeQuery()) {
-                if (rs.next()) {
-                    return mapRow(rs);
+                if (!rs.next()) {
+                    return null;
                 }
-                return null;
+                return mapRow(rs);
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find active OTP code", e);
@@ -92,16 +102,8 @@ public class OtpCodeRepository {
     }
 
     public boolean markAsUsed(Long otpCodeId) {
-        String sql = """
-                UPDATE otp_codes
-                SET status = 'USED',
-                    used_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                  AND status = 'ACTIVE'
-                """;
-
         try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement = connection.prepareStatement(MARK_AS_USED_SQL)) {
 
             statement.setLong(1, otpCodeId);
             return statement.executeUpdate() > 0;
@@ -111,15 +113,8 @@ public class OtpCodeRepository {
     }
 
     public int expireActiveCodes() {
-        String sql = """
-                UPDATE otp_codes
-                SET status = 'EXPIRED'
-                WHERE status = 'ACTIVE'
-                  AND expires_at < CURRENT_TIMESTAMP
-                """;
-
         try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement = connection.prepareStatement(EXPIRE_ACTIVE_CODES_SQL)) {
 
             return statement.executeUpdate();
         } catch (SQLException e) {
@@ -141,6 +136,14 @@ public class OtpCodeRepository {
         otpCode.setSentAt(toLocalDateTime(rs.getTimestamp("sent_at")));
         otpCode.setUsedAt(toLocalDateTime(rs.getTimestamp("used_at")));
         return otpCode;
+    }
+
+    private void setNullableTimestamp(PreparedStatement statement, int index, LocalDateTime value) throws SQLException {
+        if (value == null) {
+            statement.setTimestamp(index, null);
+            return;
+        }
+        statement.setTimestamp(index, Timestamp.valueOf(value));
     }
 
     private LocalDateTime toLocalDateTime(Timestamp timestamp) {

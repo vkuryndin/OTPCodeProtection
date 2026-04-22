@@ -13,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
-
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,12 +21,10 @@ public class TokenService {
 
     private final SecretKey secretKey;
     private final long expirationMinutes;
-    private final Set<String> revokedTokens = ConcurrentHashMap.newKeySet(); //to disable operations after logout (in memory)
+    private final Set<String> revokedTokens = ConcurrentHashMap.newKeySet();
 
-    public TokenService(
-            @Value("${jwt.secret}") String secret,
-            @Value("${jwt.expiration-minutes}") long expirationMinutes
-    ) {
+    public TokenService(@Value("${jwt.secret}") String secret,
+                        @Value("${jwt.expiration-minutes}") long expirationMinutes) {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMinutes = expirationMinutes;
     }
@@ -56,9 +53,13 @@ public class TokenService {
         return claims.get("role", String.class);
     }
 
-    //before deleting toekns if logout
-    /*
+    public void revokeToken(String token) {
+        revokedTokens.add(token);
+    }
+
     private Claims parseClaims(String token) {
+        ensureTokenNotRevoked(token);
+
         try {
             return Jwts.parser()
                     .verifyWith(secretKey)
@@ -66,29 +67,13 @@ public class TokenService {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid or expired token");
+            throw new UnauthorizedException("Invalid or expired token");
         }
     }
 
-     */
-
-    private Claims parseClaims(String token) {
+    private void ensureTokenNotRevoked(String token) {
         if (revokedTokens.contains(token)) {
             throw new UnauthorizedException("Invalid or expired token");
         }
-
-        try {
-            return Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-        } catch (Exception e) {
-            throw new UnauthorizedException("Invalid or expired token");
-        }
-    }
-
-    public void revokeToken(String token) {
-        revokedTokens.add(token);
     }
 }

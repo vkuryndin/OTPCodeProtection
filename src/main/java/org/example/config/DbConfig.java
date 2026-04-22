@@ -4,17 +4,11 @@ import java.io.InputStream;
 import java.util.Properties;
 
 public class DbConfig {
-    private final Properties properties = new Properties();
+
+    private final Properties properties;
 
     public DbConfig() {
-        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("db.properties")) {
-            if (inputStream == null) {
-                throw new RuntimeException("db.properties not found");
-            }
-            properties.load(inputStream);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to load database configuration", e);
-        }
+        this.properties = loadProperties();
     }
 
     public String getUrl() {
@@ -27,5 +21,20 @@ public class DbConfig {
 
     public String getPassword() {
         return properties.getProperty("db.password");
+    }
+
+    private Properties loadProperties() {
+        Properties loadedProperties = new Properties();
+
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("db.properties")) {
+            if (inputStream == null) {
+                throw new RuntimeException("db.properties not found");
+            }
+
+            loadedProperties.load(inputStream);
+            return loadedProperties;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load database configuration", e);
+        }
     }
 }

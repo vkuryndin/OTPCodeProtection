@@ -20,7 +20,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        long start = System.currentTimeMillis();
+        long startTime = System.currentTimeMillis();
 
         String method = request.getMethod();
         String path = request.getRequestURI();
@@ -28,7 +28,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         try {
             filterChain.doFilter(request, response);
         } finally {
-            long durationMs = System.currentTimeMillis() - start;
+            long durationMs = System.currentTimeMillis() - startTime;
             int status = response.getStatus();
 
             log.info("HTTP {} {} -> {} ({} ms)", method, path, status, durationMs);

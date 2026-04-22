@@ -1,5 +1,7 @@
 package org.example.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -12,16 +14,14 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Service
 public class TelegramDeliveryService {
+
+    private static final Logger log = LoggerFactory.getLogger(TelegramDeliveryService.class);
 
     private final String telegramApiUrl;
     private final String botToken;
     private final HttpClient httpClient = HttpClient.newHttpClient();
-    private static final Logger log = LoggerFactory.getLogger(TelegramDeliveryService.class);
 
     public TelegramDeliveryService(@Value("${telegram.api-url}") String telegramApiUrl,
                                    @Value("${telegram.bot-token}") String botToken) {
@@ -38,17 +38,8 @@ public class TelegramDeliveryService {
             throw new IllegalArgumentException("User telegram chat id is not set");
         }
 
-        String message = "Your OTP code is: " + code
-                + "\nOperation ID: " + operationId
-                + "\nUser ID: " + userId
-                + "\nExpires at: " + expiresAt;
-
-        String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
-
-        String url = telegramApiUrl
-                + "/bot" + botToken
-                + "/sendMessage?chat_id=" + chatId.trim()
-                + "&text=" + encodedMessage;
+        String normalizedChatId = chatId.trim();
+        String url = buildSendMessageUrl(normalizedChatId, userId, operationId, code, expiresAt);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -68,7 +59,7 @@ public class TelegramDeliveryService {
             }
 
             log.info("Telegram OTP sent: userId={}, operationId={}, chatId={}",
-                    userId, operationId, chatId);
+                    userId, operationId, normalizedChatId);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("Failed to send Telegram message: userId={}, operationId={}, chatId={}",
@@ -79,5 +70,23 @@ public class TelegramDeliveryService {
                     userId, operationId, chatId, e);
             throw new RuntimeException("Failed to send Telegram message", e);
         }
+    }
+
+    private String buildSendMessageUrl(String chatId,
+                                       Long userId,
+                                       String operationId,
+                                       String code,
+                                       LocalDateTime expiresAt) {
+        String message = "Your OTP code is: " + code
+                + "\nOperation ID: " + operationId
+                + "\nUser ID: " + userId
+                + "\nExpires at: " + expiresAt;
+
+        String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
+
+        return telegramApiUrl
+                + "/bot" + botToken
+                + "/sendMessage?chat_id=" + chatId
+                + "&text=" + encodedMessage;
     }
 }

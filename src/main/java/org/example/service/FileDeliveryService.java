@@ -1,5 +1,7 @@
 package org.example.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -8,11 +10,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Service
 public class FileDeliveryService {
+
     private static final Logger log = LoggerFactory.getLogger(FileDeliveryService.class);
 
     public void saveOtpToFile(String fileName,

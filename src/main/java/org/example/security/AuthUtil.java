@@ -7,10 +7,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class AuthUtil {
 
+    private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
     public String extractToken(HttpServletRequest request) {
-        String authHeader = request.getHeader("Authorization");
+        String authHeader = request.getHeader(AUTHORIZATION_HEADER);
 
         if (authHeader == null || authHeader.isBlank()) {
             throw new UnauthorizedException("Authorization header is required");

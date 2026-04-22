@@ -10,17 +10,18 @@ import org.jsmpp.bean.SMSCDeliveryReceipt;
 import org.jsmpp.bean.TypeOfNumber;
 import org.jsmpp.session.BindParameter;
 import org.jsmpp.session.SMPPSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @Service
 public class SmsDeliveryService {
+
+    private static final Logger log = LoggerFactory.getLogger(SmsDeliveryService.class);
 
     private final String host;
     private final int port;
@@ -28,8 +29,6 @@ public class SmsDeliveryService {
     private final String password;
     private final String systemType;
     private final String sourceAddr;
-
-    private static final Logger log = LoggerFactory.getLogger(SmsDeliveryService.class);
 
     public SmsDeliveryService(@Value("${smpp.host}") String host,
                               @Value("${smpp.port}") int port,
@@ -54,25 +53,13 @@ public class SmsDeliveryService {
             throw new IllegalArgumentException("User phone is not set");
         }
 
+        String normalizedPhone = phone.trim();
+        String text = buildMessageText(userId, operationId, code, expiresAt);
+
         SMPPSession session = new SMPPSession();
 
         try {
-            BindParameter bindParameter = new BindParameter(
-                    BindType.BIND_TX,
-                    systemId,
-                    password,
-                    systemType,
-                    TypeOfNumber.UNKNOWN,
-                    NumberingPlanIndicator.UNKNOWN,
-                    sourceAddr
-            );
-
-            session.connectAndBind(host, port, bindParameter);
-
-            String text = "Your OTP code is: " + code
-                    + ", operationId=" + operationId
-                    + ", userId=" + userId
-                    + ", expiresAt=" + expiresAt;
+            session.connectAndBind(host, port, buildBindParameter());
 
             session.submitShortMessage(
                     systemType,
@@ -81,7 +68,7 @@ public class SmsDeliveryService {
                     sourceAddr,
                     TypeOfNumber.UNKNOWN,
                     NumberingPlanIndicator.UNKNOWN,
-                    phone.trim(),
+                    normalizedPhone,
                     new ESMClass(),
                     (byte) 0,
                     (byte) 1,
@@ -95,7 +82,7 @@ public class SmsDeliveryService {
             );
 
             log.info("OTP SMS sent: userId={}, operationId={}, phone={}",
-                    userId, operationId, phone.trim());
+                    userId, operationId, normalizedPhone);
         } catch (java.io.IOException e) {
             log.warn("SMPP simulator is not available: userId={}, operationId={}, phone={}, host={}, port={}",
                     userId, operationId, phone, host, port);
@@ -110,5 +97,27 @@ public class SmsDeliveryService {
             } catch (Exception ignored) {
             }
         }
+    }
+
+    private BindParameter buildBindParameter() {
+        return new BindParameter(
+                BindType.BIND_TX,
+                systemId,
+                password,
+                systemType,
+                TypeOfNumber.UNKNOWN,
+                NumberingPlanIndicator.UNKNOWN,
+                sourceAddr
+        );
+    }
+
+    private String buildMessageText(Long userId,
+                                    String operationId,
+                                    String code,
+                                    LocalDateTime expiresAt) {
+        return "Your OTP code is: " + code
+                + ", operationId=" + operationId
+                + ", userId=" + userId
+                + ", expiresAt=" + expiresAt;
     }
 }

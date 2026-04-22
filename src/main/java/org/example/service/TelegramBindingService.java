@@ -22,6 +22,8 @@ import java.util.UUID;
 @Service
 public class TelegramBindingService {
 
+    private static final Logger log = LoggerFactory.getLogger(TelegramBindingService.class);
+
     private final UserRepository userRepository;
     private final EmailDeliveryService emailDeliveryService;
     private final String botUsername;
@@ -30,7 +32,6 @@ public class TelegramBindingService {
     private final String botToken;
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private static final Logger log = LoggerFactory.getLogger(TelegramBindingService.class);
 
     public TelegramBindingService(UserRepository userRepository,
                                   EmailDeliveryService emailDeliveryService,
@@ -47,11 +48,7 @@ public class TelegramBindingService {
     }
 
     public Map<String, Object> startBinding(Long userId) {
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            log.warn("Telegram bind start failed: user not found, userId={}", userId);
-            throw new IllegalArgumentException("User not found");
-        }
+        User user = requireUser(userId);
 
         if (user.getEmail() == null || user.getEmail().isBlank()) {
             log.warn("Telegram bind start failed: email is not set, userId={}, login={}",
@@ -61,11 +58,9 @@ public class TelegramBindingService {
 
         String bindToken = UUID.randomUUID().toString();
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(bindExpirationMinutes);
-
-        userRepository.updateTelegramBindToken(userId, bindToken, expiresAt);
-
         String bindLink = "https://t.me/" + botUsername + "?start=" + bindToken;
 
+        userRepository.updateTelegramBindToken(userId, bindToken, expiresAt);
         emailDeliveryService.sendTelegramBindEmail(user.getEmail(), bindLink, expiresAt);
 
         log.info("Telegram bind started: userId={}, login={}, email={}, expiresAt={}",
@@ -75,16 +70,11 @@ public class TelegramBindingService {
         response.put("message", "Telegram bind link sent successfully");
         response.put("email", user.getEmail());
         response.put("expiresAt", expiresAt);
-
         return response;
     }
 
     public Map<String, Object> completeBinding(Long userId) {
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            log.warn("Telegram bind complete failed: user not found, userId={}", userId);
-            throw new IllegalArgumentException("User not found");
-        }
+        User user = requireUser(userId);
 
         if (user.getTelegramBindToken() == null || user.getTelegramBindToken().isBlank()) {
             log.warn("Telegram bind complete failed: bind token is not set, userId={}, login={}",
@@ -115,8 +105,16 @@ public class TelegramBindingService {
         response.put("message", "Telegram bound successfully");
         response.put("userId", userId);
         response.put("telegramChatId", chatId);
-
         return response;
+    }
+
+    private User requireUser(Long userId) {
+        User user = userRepository.findById(userId);
+        if (user == null) {
+            log.warn("Telegram bind start failed: user not found, userId={}", userId);
+            throw new IllegalArgumentException("User not found");
+        }
+        return user;
     }
 
     private String findChatIdByBindToken(String bindToken) {

@@ -16,6 +16,7 @@ public class PasswordHasher {
         if (rawPassword == null || hashedPassword == null) {
             return false;
         }
+
         return BCrypt.checkpw(rawPassword, hashedPassword);
     }
 }

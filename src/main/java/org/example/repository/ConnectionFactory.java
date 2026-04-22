@@ -6,7 +6,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
-public class ConnectionFactory {
+public final class ConnectionFactory {
+
     private static final DbConfig DB_CONFIG = new DbConfig();
 
     private ConnectionFactory() {

@@ -18,71 +18,66 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    private static final String SMPP_UNAVAILABLE_MESSAGE =
+            "SMPP simulator is not available. Start the SMPP server and try again.";
+
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<Map<String, Object>> handleUnauthorized(UnauthorizedException e,
                                                                   HttpServletRequest request) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("error", e.getMessage());
-
         log.warn("HTTP 401: {} {} -> {}", request.getMethod(), request.getRequestURI(), e.getMessage());
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, e.getMessage());
     }
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(NotFoundException e,
                                                               HttpServletRequest request) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("error", e.getMessage());
-
         log.warn("HTTP 404: {} {} -> {}", request.getMethod(), request.getRequestURI(), e.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        return buildErrorResponse(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e,
                                                                 HttpServletRequest request) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("error", e.getMessage());
-
         log.warn("HTTP 400: {} {} -> {}", request.getMethod(), request.getRequestURI(), e.getMessage());
-        return ResponseEntity.badRequest().body(response);
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleConflict(IllegalStateException e,
                                                               HttpServletRequest request) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("error", e.getMessage());
-
         log.warn("HTTP 409: {} {} -> {}", request.getMethod(), request.getRequestURI(), e.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        return buildErrorResponse(HttpStatus.CONFLICT, e.getMessage());
     }
 
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<Map<String, Object>> handleForbidden(SecurityException e,
                                                                HttpServletRequest request) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("error", e.getMessage());
-
         log.warn("HTTP 403: {} {} -> {}", request.getMethod(), request.getRequestURI(), e.getMessage());
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        return buildErrorResponse(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntime(RuntimeException e,
                                                              HttpServletRequest request) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("error", e.getMessage());
-
         String message = e.getMessage();
 
-        if ("SMPP simulator is not available. Start the SMPP server and try again.".equals(message)
-                || (message != null && message.startsWith("Cannot connect to SMPP simulator"))) {
+        if (isSmppUnavailable(message)) {
             log.warn("HTTP 503: {} {} -> {}", request.getMethod(), request.getRequestURI(), message);
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+            return buildErrorResponse(HttpStatus.SERVICE_UNAVAILABLE, message);
         }
 
         log.error("HTTP 500: {} {} -> {}", request.getMethod(), request.getRequestURI(), message, e);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, message);
+    }
+
+    private boolean isSmppUnavailable(String message) {
+        return SMPP_UNAVAILABLE_MESSAGE.equals(message)
+                || (message != null && message.startsWith("Cannot connect to SMPP simulator"));
+    }
+
+    private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String message) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("error", message);
+        return ResponseEntity.status(status).body(response);
     }
 }

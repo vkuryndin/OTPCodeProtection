@@ -20,7 +20,11 @@ public class OtpExpirationService {
     @Scheduled(fixedRate = 30000)
     public void expireCodes() {
         try {
-            otpCodeRepository.expireActiveCodes();
+            int expiredCount = otpCodeRepository.expireActiveCodes();
+
+            if (expiredCount > 0) {
+                log.info("Expired OTP codes: count={}", expiredCount);
+            }
         } catch (Exception e) {
             log.error("Failed to expire OTP codes", e);
         }
