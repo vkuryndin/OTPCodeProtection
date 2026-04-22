@@ -3,24 +3,36 @@ package org.example.config;
 import java.io.InputStream;
 import java.util.Properties;
 
-public class DbConfig {
+public final class DbConfig {
 
-    private final Properties properties;
-
-    public DbConfig() {
-        this.properties = loadProperties();
-    }
+    private volatile Properties properties;
 
     public String getUrl() {
-        return properties.getProperty("db.url");
+        return getProperties().getProperty("db.url");
     }
 
     public String getUser() {
-        return properties.getProperty("db.user");
+        return getProperties().getProperty("db.user");
     }
 
     public String getPassword() {
-        return properties.getProperty("db.password");
+        return getProperties().getProperty("db.password");
+    }
+
+    private Properties getProperties() {
+        Properties loaded = properties;
+
+        if (loaded == null) {
+            synchronized (this) {
+                loaded = properties;
+                if (loaded == null) {
+                    loaded = loadProperties();
+                    properties = loaded;
+                }
+            }
+        }
+
+        return loaded;
     }
 
     private Properties loadProperties() {

@@ -1,7 +1,7 @@
 ### Base variables
 @host = http://localhost:8080
 @adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc4Nzc1MCwiZXhwIjoxNzc2NzkxMzUwfQ.RYEl5qVgmjixZN7UwW3lI8CkqXRg8C3JxgzLmpY6Ofa2jfyDJ8r-udICfopZtoec
-@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI5IiwibG9naW4iOiJ1c2VyXzMiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3Njc5Mjg4OCwiZXhwIjoxNzc2Nzk2NDg4fQ.LqWX4HdP3xUQTXB7Ehytzb1MgQMNZ132JP0Z0dDfFle2efgbZNfTelWOyBv9TORK
+@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxMCIsImxvZ2luIjoidXNlcl80Iiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NzY4ODM0NDcsImV4cCI6MTc3Njg4NzA0N30.fW8ewGYbmr_fpt5cVEenh0mm7urjTuIxogR9lQpxH4SenrbWhWoVacLgQjoR67Ro
 @userId = 5
 @otpFile = otp-codes.txt
 @otpCode = 599987
@@ -34,7 +34,7 @@ POST {{host}}/auth/login
 Content-Type: application/json
 
 {
-  "login": "user_5",
+  "login": "user_4",
   "password": "12345678"
 }
 ### Login as user - valid

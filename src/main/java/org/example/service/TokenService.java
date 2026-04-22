@@ -19,17 +19,21 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class TokenService {
 
-    private final SecretKey secretKey;
+    private final String secret;
     private final long expirationMinutes;
     private final Set<String> revokedTokens = ConcurrentHashMap.newKeySet();
 
+    private volatile SecretKey secretKey;
+
     public TokenService(@Value("${jwt.secret}") String secret,
                         @Value("${jwt.expiration-minutes}") long expirationMinutes) {
-        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        this.secret = secret;
         this.expirationMinutes = expirationMinutes;
     }
 
     public String generateToken(User user) {
+        validateExpirationMinutes();
+
         Instant now = Instant.now();
         Instant expiresAt = now.plus(expirationMinutes, ChronoUnit.MINUTES);
 
@@ -39,7 +43,7 @@ public class TokenService {
                 .claim("role", user.getRole().name())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
-                .signWith(secretKey)
+                .signWith(getSecretKey())
                 .compact();
     }
 
@@ -62,7 +66,7 @@ public class TokenService {
 
         try {
             return Jwts.parser()
-                    .verifyWith(secretKey)
+                    .verifyWith(getSecretKey())
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
@@ -74,6 +78,32 @@ public class TokenService {
     private void ensureTokenNotRevoked(String token) {
         if (revokedTokens.contains(token)) {
             throw new UnauthorizedException("Invalid or expired token");
+        }
+    }
+
+    private SecretKey getSecretKey() {
+        SecretKey localKey = secretKey;
+
+        if (localKey == null) {
+            synchronized (this) {
+                localKey = secretKey;
+                if (localKey == null) {
+                    try {
+                        localKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+                        secretKey = localKey;
+                    } catch (Exception e) {
+                        throw new IllegalStateException("JWT secret is invalid", e);
+                    }
+                }
+            }
+        }
+
+        return localKey;
+    }
+
+    private void validateExpirationMinutes() {
+        if (expirationMinutes <= 0) {
+            throw new IllegalStateException("JWT expiration must be greater than 0");
         }
     }
 }

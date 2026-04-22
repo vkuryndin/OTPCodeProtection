@@ -1,7 +1,15 @@
+
+import com.github.spotbugs.snom.Confidence
+import com.github.spotbugs.snom.Effort
+import com.github.spotbugs.snom.SpotBugsTask
+
 plugins {
     id("java")
+    id("checkstyle")
     id("org.springframework.boot") version "3.5.13"
     id("io.spring.dependency-management") version "1.1.7"
+    id("com.github.spotbugs") version "6.5.1"
+    id("com.diffplug.spotless") version "8.4.0"
 }
 
 group = "org.example"
@@ -36,4 +44,51 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+// Spotbugz
+spotbugs {
+    ignoreFailures.set(false)
+    showStackTraces.set(true)
+    showProgress.set(true)
+    effort.set(Effort.DEFAULT)
+    reportLevel.set(Confidence.DEFAULT)
+}
+
+tasks.withType<SpotBugsTask>().configureEach {
+    excludeFilter.set(layout.projectDirectory.file("config/spotbugs/excludeFilter.xml"))
+    reports.create("html") {
+        required.set(true)
+        outputLocation.set(layout.buildDirectory.file("reports/spotbugs/$name.html"))
+    }
+    reports.create("xml") {
+        required.set(false)
+    }
+}
+
+// Spotless
+spotless {
+    java {
+        target("src/main/java/**/*.java", "src/test/java/**/*.java")
+        googleJavaFormat()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+
+    kotlinGradle {
+        target("*.gradle.kts")
+        ktlint()
+    }
+}
+
+// Checkstyle
+checkstyle {
+    toolVersion = "10.12.4"
+}
+
+tasks.withType<Checkstyle>().configureEach {
+    reports {
+        xml.required.set(false)
+        html.required.set(true)
+    }
 }
