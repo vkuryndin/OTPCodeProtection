@@ -29,6 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class TelegramBindingApiITTest {
 
+    private static final String PASSWORD = "12345678";
+
     @Autowired
     private TestRestTemplate restTemplate;
 
@@ -41,14 +43,9 @@ class TelegramBindingApiITTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private final String password = "12345678";
-
     private String noEmailLogin;
     private String noBindTokenLogin;
     private String expiredBindLogin;
-
-    private Long noBindTokenUserId;
-    private Long expiredBindUserId;
 
     @BeforeEach
     void setUp() {
@@ -62,7 +59,7 @@ class TelegramBindingApiITTest {
 
         User noEmailUser = new User();
         noEmailUser.setLogin(noEmailLogin);
-        noEmailUser.setPasswordHash(passwordHasher.hash(password));
+        noEmailUser.setPasswordHash(passwordHasher.hash(PASSWORD));
         noEmailUser.setRole(Role.USER);
         noEmailUser.setEmail(null);
         noEmailUser.setPhone("+37400112233");
@@ -70,19 +67,19 @@ class TelegramBindingApiITTest {
 
         User noBindTokenUser = new User();
         noBindTokenUser.setLogin(noBindTokenLogin);
-        noBindTokenUser.setPasswordHash(passwordHasher.hash(password));
+        noBindTokenUser.setPasswordHash(passwordHasher.hash(PASSWORD));
         noBindTokenUser.setRole(Role.USER);
         noBindTokenUser.setEmail(noBindTokenLogin + "@test.com");
         noBindTokenUser.setPhone("+37400112233");
-        noBindTokenUserId = userRepository.createUser(noBindTokenUser);
+        userRepository.createUser(noBindTokenUser);
 
         User expiredBindUser = new User();
         expiredBindUser.setLogin(expiredBindLogin);
-        expiredBindUser.setPasswordHash(passwordHasher.hash(password));
+        expiredBindUser.setPasswordHash(passwordHasher.hash(PASSWORD));
         expiredBindUser.setRole(Role.USER);
         expiredBindUser.setEmail(expiredBindLogin + "@test.com");
         expiredBindUser.setPhone("+37400112233");
-        expiredBindUserId = userRepository.createUser(expiredBindUser);
+        Long expiredBindUserId = userRepository.createUser(expiredBindUser);
 
         updateTelegramBindState(
                 expiredBindUserId,
@@ -112,7 +109,7 @@ class TelegramBindingApiITTest {
 
     @Test
     void startBinding_shouldReturnBadRequest_whenUserEmailIsMissing() throws Exception {
-        String token = loginAndGetToken(noEmailLogin, password);
+        String token = loginAndGetToken(noEmailLogin);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
@@ -131,7 +128,7 @@ class TelegramBindingApiITTest {
 
     @Test
     void completeBinding_shouldReturnBadRequest_whenBindTokenIsMissing() throws Exception {
-        String token = loginAndGetToken(noBindTokenLogin, password);
+        String token = loginAndGetToken(noBindTokenLogin);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
@@ -150,7 +147,7 @@ class TelegramBindingApiITTest {
 
     @Test
     void completeBinding_shouldReturnBadRequest_whenBindTokenIsExpired() throws Exception {
-        String token = loginAndGetToken(expiredBindLogin, password);
+        String token = loginAndGetToken(expiredBindLogin);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
@@ -167,10 +164,10 @@ class TelegramBindingApiITTest {
         assertEquals("Telegram bind token expired", body.get("error").asText());
     }
 
-    private String loginAndGetToken(String login, String password) throws Exception {
+    private String loginAndGetToken(String login) throws Exception {
         LoginRequest request = new LoginRequest();
         request.setLogin(login);
-        request.setPassword(password);
+        request.setPassword(PASSWORD);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class DeliveryValidationApiITTest {
 
+    private static final String PASSWORD = "12345678";
+
     @Autowired
     private TestRestTemplate restTemplate;
 
@@ -38,8 +40,6 @@ class DeliveryValidationApiITTest {
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    private final String password = "12345678";
 
     private String emailMissingLogin;
     private String phoneMissingLogin;
@@ -60,7 +60,7 @@ class DeliveryValidationApiITTest {
 
         User emailMissingUser = new User();
         emailMissingUser.setLogin(emailMissingLogin);
-        emailMissingUser.setPasswordHash(passwordHasher.hash(password));
+        emailMissingUser.setPasswordHash(passwordHasher.hash(PASSWORD));
         emailMissingUser.setRole(Role.USER);
         emailMissingUser.setEmail(null);
         emailMissingUser.setPhone("+37400112233");
@@ -69,7 +69,7 @@ class DeliveryValidationApiITTest {
 
         User phoneMissingUser = new User();
         phoneMissingUser.setLogin(phoneMissingLogin);
-        phoneMissingUser.setPasswordHash(passwordHasher.hash(password));
+        phoneMissingUser.setPasswordHash(passwordHasher.hash(PASSWORD));
         phoneMissingUser.setRole(Role.USER);
         phoneMissingUser.setEmail(phoneMissingLogin + "@test.com");
         phoneMissingUser.setPhone(null);
@@ -78,7 +78,7 @@ class DeliveryValidationApiITTest {
 
         User telegramMissingUser = new User();
         telegramMissingUser.setLogin(telegramMissingLogin);
-        telegramMissingUser.setPasswordHash(passwordHasher.hash(password));
+        telegramMissingUser.setPasswordHash(passwordHasher.hash(PASSWORD));
         telegramMissingUser.setRole(Role.USER);
         telegramMissingUser.setEmail(telegramMissingLogin + "@test.com");
         telegramMissingUser.setPhone("+37400112233");
@@ -87,14 +87,14 @@ class DeliveryValidationApiITTest {
 
         User fileUser = new User();
         fileUser.setLogin(fileLogin);
-        fileUser.setPasswordHash(passwordHasher.hash(password));
+        fileUser.setPasswordHash(passwordHasher.hash(PASSWORD));
         fileUser.setRole(Role.USER);
         fileUser.setEmail(fileLogin + "@test.com");
         fileUser.setPhone("+37400112233");
         fileUser.setTelegramChatId("123456789");
         userRepository.createUser(fileUser);
 
-        upsertOtpConfig(6, 300);
+        resetOtpConfig();
     }
 
     @AfterEach
@@ -104,12 +104,12 @@ class DeliveryValidationApiITTest {
         deleteUserByLogin(telegramMissingLogin);
         deleteUserByLogin(fileLogin);
 
-        upsertOtpConfig(6, 300);
+        resetOtpConfig();
     }
 
     @Test
     void generateOtp_shouldReturnBadRequest_whenEmailChannelAndUserEmailIsMissing() throws Exception {
-        String token = loginAndGetToken(emailMissingLogin, password);
+        String token = loginAndGetToken(emailMissingLogin);
 
         String requestBody = """
                 {
@@ -118,7 +118,7 @@ class DeliveryValidationApiITTest {
                 }
                 """;
 
-        ResponseEntity<String> response = postAuthorizedJson("/otp/generate", token, requestBody);
+        ResponseEntity<String> response = generateOtpAuthorizedJson(token, requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -129,7 +129,7 @@ class DeliveryValidationApiITTest {
 
     @Test
     void generateOtp_shouldReturnBadRequest_whenSmsChannelAndUserPhoneIsMissing() throws Exception {
-        String token = loginAndGetToken(phoneMissingLogin, password);
+        String token = loginAndGetToken(phoneMissingLogin);
 
         String requestBody = """
                 {
@@ -138,7 +138,7 @@ class DeliveryValidationApiITTest {
                 }
                 """;
 
-        ResponseEntity<String> response = postAuthorizedJson("/otp/generate", token, requestBody);
+        ResponseEntity<String> response = generateOtpAuthorizedJson(token, requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -149,7 +149,7 @@ class DeliveryValidationApiITTest {
 
     @Test
     void generateOtp_shouldReturnBadRequest_whenTelegramChannelAndChatIdIsMissing() throws Exception {
-        String token = loginAndGetToken(telegramMissingLogin, password);
+        String token = loginAndGetToken(telegramMissingLogin);
 
         String requestBody = """
                 {
@@ -158,7 +158,7 @@ class DeliveryValidationApiITTest {
                 }
                 """;
 
-        ResponseEntity<String> response = postAuthorizedJson("/otp/generate", token, requestBody);
+        ResponseEntity<String> response = generateOtpAuthorizedJson(token, requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -169,7 +169,7 @@ class DeliveryValidationApiITTest {
 
     @Test
     void generateOtp_shouldReturnBadRequest_whenFileChannelAndDeliveryTargetIsMissing() throws Exception {
-        String token = loginAndGetToken(fileLogin, password);
+        String token = loginAndGetToken(fileLogin);
 
         String requestBody = """
                 {
@@ -178,7 +178,7 @@ class DeliveryValidationApiITTest {
                 }
                 """;
 
-        ResponseEntity<String> response = postAuthorizedJson("/otp/generate", token, requestBody);
+        ResponseEntity<String> response = generateOtpAuthorizedJson(token, requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -187,10 +187,10 @@ class DeliveryValidationApiITTest {
         assertEquals("Delivery target is required", body.get("error").asText());
     }
 
-    private String loginAndGetToken(String login, String password) throws Exception {
+    private String loginAndGetToken(String login) throws Exception {
         LoginRequest request = new LoginRequest();
         request.setLogin(login);
-        request.setPassword(password);
+        request.setPassword(PASSWORD);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -207,13 +207,13 @@ class DeliveryValidationApiITTest {
         return body.get("token").asText();
     }
 
-    private ResponseEntity<String> postAuthorizedJson(String url, String token, String requestBody) {
+    private ResponseEntity<String> generateOtpAuthorizedJson(String token, String requestBody) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(token);
 
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
-        return restTemplate.postForEntity(url, entity, String.class);
+        return restTemplate.postForEntity("/otp/generate", entity, String.class);
     }
 
     private void deleteUserByLogin(String login) {
@@ -229,10 +229,10 @@ class DeliveryValidationApiITTest {
         }
     }
 
-    private void upsertOtpConfig(int codeLength, int ttlSeconds) {
+    private void resetOtpConfig() {
         String sql = """
                 INSERT INTO otp_config (id, code_length, ttl_seconds, updated_at)
-                VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (1, 6, 300, CURRENT_TIMESTAMP)
                 ON CONFLICT (id)
                 DO UPDATE SET
                     code_length = EXCLUDED.code_length,
@@ -243,11 +243,9 @@ class DeliveryValidationApiITTest {
         try (Connection connection = ConnectionFactory.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            statement.setInt(1, codeLength);
-            statement.setInt(2, ttlSeconds);
             statement.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to upsert OTP config", e);
+            throw new RuntimeException("Failed to reset OTP config", e);
         }
     }
 

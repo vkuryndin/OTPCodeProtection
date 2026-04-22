@@ -32,6 +32,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class UserDeleteCascadeApiITTest {
 
+    private static final String PASSWORD = "12345678";
+
     @Autowired
     private TestRestTemplate restTemplate;
 
@@ -47,10 +49,6 @@ class UserDeleteCascadeApiITTest {
     private String adminLogin;
     private String userLogin;
 
-    private final String adminPassword = "12345678";
-    private final String userPassword = "12345678";
-
-    private Long adminId;
     private Long userId;
 
     private Path otpFile;
@@ -69,21 +67,21 @@ class UserDeleteCascadeApiITTest {
 
         User admin = new User();
         admin.setLogin(adminLogin);
-        admin.setPasswordHash(passwordHasher.hash(adminPassword));
+        admin.setPasswordHash(passwordHasher.hash(PASSWORD));
         admin.setRole(Role.ADMIN);
         admin.setEmail(adminLogin + "@test.com");
         admin.setPhone("+37400110000");
-        adminId = userRepository.createUser(admin);
+        userRepository.createUser(admin);
 
         User user = new User();
         user.setLogin(userLogin);
-        user.setPasswordHash(passwordHasher.hash(userPassword));
+        user.setPasswordHash(passwordHasher.hash(PASSWORD));
         user.setRole(Role.USER);
         user.setEmail(userLogin + "@test.com");
         user.setPhone("+37400112233");
         userId = userRepository.createUser(user);
 
-        upsertOtpConfig(6, 300);
+        resetOtpConfig();
     }
 
     @AfterEach
@@ -91,20 +89,26 @@ class UserDeleteCascadeApiITTest {
         deleteUserByLogin(userLogin);
         deleteUserByLogin(adminLogin);
         Files.deleteIfExists(otpFile);
-        upsertOtpConfig(6, 300);
+        resetOtpConfig();
     }
 
     @Test
     void deleteUser_shouldAlsoDeleteUserOtpCodes() throws Exception {
-        String userToken = loginAndGetToken(userLogin, userPassword);
+        String userToken = loginAndGetToken(userLogin);
 
         GenerateOtpRequest generateRequest = new GenerateOtpRequest();
         generateRequest.setOperationId("payment-delete-001");
         generateRequest.setDeliveryChannel(DeliveryChannel.FILE);
         generateRequest.setDeliveryTarget(otpFile.toString());
 
+        HttpHeaders generateHeaders = new HttpHeaders();
+        generateHeaders.setContentType(MediaType.APPLICATION_JSON);
+        generateHeaders.setBearerAuth(userToken);
+
+        HttpEntity<GenerateOtpRequest> generateEntity = new HttpEntity<>(generateRequest, generateHeaders);
+
         ResponseEntity<String> generateResponse =
-                postAuthorized("/otp/generate", userToken, generateRequest);
+                restTemplate.postForEntity("/otp/generate", generateEntity, String.class);
 
         assertEquals(HttpStatus.CREATED, generateResponse.getStatusCode());
         assertTrue(Files.exists(otpFile));
@@ -112,7 +116,7 @@ class UserDeleteCascadeApiITTest {
         long otpCountBeforeDelete = countOtpCodesByUserId(userId);
         assertTrue(otpCountBeforeDelete > 0, "User should have OTP codes before deletion");
 
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
+        String adminToken = loginAndGetToken(adminLogin);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(adminToken);
@@ -137,10 +141,10 @@ class UserDeleteCascadeApiITTest {
         assertEquals(0, countOtpCodesByUserId(userId), "User OTP codes should be deleted by cascade");
     }
 
-    private String loginAndGetToken(String login, String password) throws Exception {
+    private String loginAndGetToken(String login) throws Exception {
         LoginRequest request = new LoginRequest();
         request.setLogin(login);
-        request.setPassword(password);
+        request.setPassword(PASSWORD);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -155,15 +159,6 @@ class UserDeleteCascadeApiITTest {
 
         JsonNode body = objectMapper.readTree(response.getBody());
         return body.get("token").asText();
-    }
-
-    private ResponseEntity<String> postAuthorized(String url, String token, Object body) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(token);
-
-        HttpEntity<Object> entity = new HttpEntity<>(body, headers);
-        return restTemplate.postForEntity(url, entity, String.class);
     }
 
     private long countOtpCodesByUserId(Long userId) {
@@ -213,10 +208,10 @@ class UserDeleteCascadeApiITTest {
         }
     }
 
-    private void upsertOtpConfig(int codeLength, int ttlSeconds) {
+    private void resetOtpConfig() {
         String sql = """
                 INSERT INTO otp_config (id, code_length, ttl_seconds, updated_at)
-                VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (1, 6, 300, CURRENT_TIMESTAMP)
                 ON CONFLICT (id)
                 DO UPDATE SET
                     code_length = EXCLUDED.code_length,
@@ -227,11 +222,9 @@ class UserDeleteCascadeApiITTest {
         try (Connection connection = ConnectionFactory.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            statement.setInt(1, codeLength);
-            statement.setInt(2, ttlSeconds);
             statement.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to upsert OTP config", e);
+            throw new RuntimeException("Failed to reset OTP config", e);
         }
     }
 }

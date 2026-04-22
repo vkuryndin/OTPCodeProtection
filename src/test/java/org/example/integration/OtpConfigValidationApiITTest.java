@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class OtpConfigValidationApiITTest {
 
+    private static final String PASSWORD = "12345678";
+
     @Autowired
     private TestRestTemplate restTemplate;
 
@@ -42,9 +44,6 @@ class OtpConfigValidationApiITTest {
     private String adminLogin;
     private String userLogin;
 
-    private final String adminPassword = "12345678";
-    private final String userPassword = "12345678";
-
     @BeforeEach
     void setUp() {
         adminLogin = "it_admin_cfg_" + shortId();
@@ -55,7 +54,7 @@ class OtpConfigValidationApiITTest {
 
         User admin = new User();
         admin.setLogin(adminLogin);
-        admin.setPasswordHash(passwordHasher.hash(adminPassword));
+        admin.setPasswordHash(passwordHasher.hash(PASSWORD));
         admin.setRole(Role.ADMIN);
         admin.setEmail(adminLogin + "@test.com");
         admin.setPhone("+37400110000");
@@ -63,25 +62,25 @@ class OtpConfigValidationApiITTest {
 
         User user = new User();
         user.setLogin(userLogin);
-        user.setPasswordHash(passwordHasher.hash(userPassword));
+        user.setPasswordHash(passwordHasher.hash(PASSWORD));
         user.setRole(Role.USER);
         user.setEmail(userLogin + "@test.com");
         user.setPhone("+37400112233");
         userRepository.createUser(user);
 
-        upsertOtpConfig(6, 300);
+        resetOtpConfig();
     }
 
     @AfterEach
     void tearDown() {
         deleteUserByLogin(userLogin);
         deleteUserByLogin(adminLogin);
-        upsertOtpConfig(6, 300);
+        resetOtpConfig();
     }
 
     @Test
     void updateOtpConfig_shouldReturnBadRequest_whenCodeLengthIsTooSmall() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
+        String adminToken = loginAndGetToken(adminLogin);
 
         String requestBody = """
                 {
@@ -90,7 +89,7 @@ class OtpConfigValidationApiITTest {
                 }
                 """;
 
-        ResponseEntity<String> response = putAuthorized("/admin/otp-config", adminToken, requestBody);
+        ResponseEntity<String> response = putAuthorizedOtpConfig(adminToken, requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -101,7 +100,7 @@ class OtpConfigValidationApiITTest {
 
     @Test
     void updateOtpConfig_shouldReturnBadRequest_whenCodeLengthIsTooLarge() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
+        String adminToken = loginAndGetToken(adminLogin);
 
         String requestBody = """
                 {
@@ -110,7 +109,7 @@ class OtpConfigValidationApiITTest {
                 }
                 """;
 
-        ResponseEntity<String> response = putAuthorized("/admin/otp-config", adminToken, requestBody);
+        ResponseEntity<String> response = putAuthorizedOtpConfig(adminToken, requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -121,7 +120,7 @@ class OtpConfigValidationApiITTest {
 
     @Test
     void updateOtpConfig_shouldReturnBadRequest_whenTtlIsZero() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
+        String adminToken = loginAndGetToken(adminLogin);
 
         String requestBody = """
                 {
@@ -130,7 +129,7 @@ class OtpConfigValidationApiITTest {
                 }
                 """;
 
-        ResponseEntity<String> response = putAuthorized("/admin/otp-config", adminToken, requestBody);
+        ResponseEntity<String> response = putAuthorizedOtpConfig(adminToken, requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -141,7 +140,7 @@ class OtpConfigValidationApiITTest {
 
     @Test
     void updateOtpConfig_shouldReturnBadRequest_whenCodeLengthIsMissing() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
+        String adminToken = loginAndGetToken(adminLogin);
 
         String requestBody = """
                 {
@@ -149,7 +148,7 @@ class OtpConfigValidationApiITTest {
                 }
                 """;
 
-        ResponseEntity<String> response = putAuthorized("/admin/otp-config", adminToken, requestBody);
+        ResponseEntity<String> response = putAuthorizedOtpConfig(adminToken, requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -160,7 +159,7 @@ class OtpConfigValidationApiITTest {
 
     @Test
     void updateOtpConfig_shouldReturnBadRequest_whenTtlIsMissing() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
+        String adminToken = loginAndGetToken(adminLogin);
 
         String requestBody = """
                 {
@@ -168,7 +167,7 @@ class OtpConfigValidationApiITTest {
                 }
                 """;
 
-        ResponseEntity<String> response = putAuthorized("/admin/otp-config", adminToken, requestBody);
+        ResponseEntity<String> response = putAuthorizedOtpConfig(adminToken, requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -207,7 +206,7 @@ class OtpConfigValidationApiITTest {
 
     @Test
     void updateOtpConfig_shouldReturnForbidden_forUser() throws Exception {
-        String userToken = loginAndGetToken(userLogin, userPassword);
+        String userToken = loginAndGetToken(userLogin);
 
         String requestBody = """
                 {
@@ -216,7 +215,7 @@ class OtpConfigValidationApiITTest {
                 }
                 """;
 
-        ResponseEntity<String> response = putAuthorized("/admin/otp-config", userToken, requestBody);
+        ResponseEntity<String> response = putAuthorizedOtpConfig(userToken, requestBody);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -225,10 +224,10 @@ class OtpConfigValidationApiITTest {
         assertEquals("Access denied", body.get("error").asText());
     }
 
-    private String loginAndGetToken(String login, String password) throws Exception {
+    private String loginAndGetToken(String login) throws Exception {
         LoginRequest request = new LoginRequest();
         request.setLogin(login);
-        request.setPassword(password);
+        request.setPassword(PASSWORD);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -245,7 +244,7 @@ class OtpConfigValidationApiITTest {
         return body.get("token").asText();
     }
 
-    private ResponseEntity<String> putAuthorized(String url, String token, String requestBody) {
+    private ResponseEntity<String> putAuthorizedOtpConfig(String token, String requestBody) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(token);
@@ -253,7 +252,7 @@ class OtpConfigValidationApiITTest {
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
 
         return restTemplate.exchange(
-                url,
+                "/admin/otp-config",
                 HttpMethod.PUT,
                 entity,
                 String.class
@@ -273,10 +272,10 @@ class OtpConfigValidationApiITTest {
         }
     }
 
-    private void upsertOtpConfig(int codeLength, int ttlSeconds) {
+    private void resetOtpConfig() {
         String sql = """
                 INSERT INTO otp_config (id, code_length, ttl_seconds, updated_at)
-                VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (1, 6, 300, CURRENT_TIMESTAMP)
                 ON CONFLICT (id)
                 DO UPDATE SET
                     code_length = EXCLUDED.code_length,
@@ -287,11 +286,9 @@ class OtpConfigValidationApiITTest {
         try (Connection connection = ConnectionFactory.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            statement.setInt(1, codeLength);
-            statement.setInt(2, ttlSeconds);
             statement.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to upsert OTP config", e);
+            throw new RuntimeException("Failed to reset OTP config", e);
         }
     }
 

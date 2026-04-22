@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AdminUsersApiITTest {
 
+    private static final String PASSWORD = "12345678";
+
     @Autowired
     private TestRestTemplate restTemplate;
 
@@ -43,12 +45,7 @@ class AdminUsersApiITTest {
     private String userLogin;
     private String targetUserLogin;
 
-    private final String adminPassword = "12345678";
-    private final String userPassword = "12345678";
-    private final String targetUserPassword = "12345678";
-
     private Long adminId;
-    private Long userId;
     private Long targetUserId;
 
     @BeforeEach
@@ -63,7 +60,7 @@ class AdminUsersApiITTest {
 
         User admin = new User();
         admin.setLogin(adminLogin);
-        admin.setPasswordHash(passwordHasher.hash(adminPassword));
+        admin.setPasswordHash(passwordHasher.hash(PASSWORD));
         admin.setRole(Role.ADMIN);
         admin.setEmail(adminLogin + "@test.com");
         admin.setPhone("+37400110000");
@@ -71,15 +68,15 @@ class AdminUsersApiITTest {
 
         User user = new User();
         user.setLogin(userLogin);
-        user.setPasswordHash(passwordHasher.hash(userPassword));
+        user.setPasswordHash(passwordHasher.hash(PASSWORD));
         user.setRole(Role.USER);
         user.setEmail(userLogin + "@test.com");
         user.setPhone("+37400112233");
-        userId = userRepository.createUser(user);
+        userRepository.createUser(user);
 
         User targetUser = new User();
         targetUser.setLogin(targetUserLogin);
-        targetUser.setPasswordHash(passwordHasher.hash(targetUserPassword));
+        targetUser.setPasswordHash(passwordHasher.hash(PASSWORD));
         targetUser.setRole(Role.USER);
         targetUser.setEmail(targetUserLogin + "@test.com");
         targetUser.setPhone("+37400113344");
@@ -95,7 +92,7 @@ class AdminUsersApiITTest {
 
     @Test
     void getUsers_shouldReturnNonAdminUsers_forAdmin() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
+        String adminToken = loginAndGetToken(adminLogin);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(adminToken);
@@ -139,7 +136,7 @@ class AdminUsersApiITTest {
 
     @Test
     void getUsers_shouldReturnForbidden_forUser() throws Exception {
-        String userToken = loginAndGetToken(userLogin, userPassword);
+        String userToken = loginAndGetToken(userLogin);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(userToken);
@@ -158,7 +155,7 @@ class AdminUsersApiITTest {
 
     @Test
     void deleteUser_shouldDeleteTargetUser_forAdmin() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
+        String adminToken = loginAndGetToken(adminLogin);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(adminToken);
@@ -184,7 +181,7 @@ class AdminUsersApiITTest {
 
     @Test
     void deleteUser_shouldReturnNotFound_whenUserDoesNotExist() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
+        String adminToken = loginAndGetToken(adminLogin);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(adminToken);
@@ -207,7 +204,7 @@ class AdminUsersApiITTest {
 
     @Test
     void deleteUser_shouldReturnBadRequest_whenTryingToDeleteAdmin() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
+        String adminToken = loginAndGetToken(adminLogin);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(adminToken);
@@ -229,10 +226,10 @@ class AdminUsersApiITTest {
         assertTrue(userExistsById(adminId));
     }
 
-    private String loginAndGetToken(String login, String password) throws Exception {
+    private String loginAndGetToken(String login) throws Exception {
         LoginRequest request = new LoginRequest();
         request.setLogin(login);
-        request.setPassword(password);
+        request.setPassword(PASSWORD);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
