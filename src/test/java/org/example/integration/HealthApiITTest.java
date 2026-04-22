@@ -7,6 +7,7 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.ResponseEntity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -30,7 +31,11 @@ class HealthApiITTest {
                 restTemplate.getForEntity("/health/db", String.class);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().contains("\"status\":\"UP\""));
-        assertTrue(response.getBody().contains("\"database\":\"otp_service_test\""));
+
+        String body = response.getBody();
+        assertNotNull(body);
+
+        assertTrue(body.contains("\"status\":\"UP\""));
+        assertTrue(body.contains("\"database\":\"otp_service_test\""));
     }
 }

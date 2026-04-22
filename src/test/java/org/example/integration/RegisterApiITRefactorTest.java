@@ -25,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RegisterApiITRefactorTest {
 
+    private static final String PASSWORD = "12345678";
+
     @Autowired
     private TestRestTemplate restTemplate;
 
@@ -56,7 +58,7 @@ class RegisterApiITRefactorTest {
 
         User existingUser = new User();
         existingUser.setLogin(duplicateLogin);
-        existingUser.setPasswordHash(passwordHasher.hash("12345678"));
+        existingUser.setPasswordHash(passwordHasher.hash(PASSWORD));
         existingUser.setRole(Role.USER);
         existingUser.setEmail(duplicateLogin + "@test.com");
         existingUser.setPhone("+37400112233");
@@ -64,7 +66,7 @@ class RegisterApiITRefactorTest {
 
         User existingAdmin = new User();
         existingAdmin.setLogin(existingAdminLogin);
-        existingAdmin.setPasswordHash(passwordHasher.hash("12345678"));
+        existingAdmin.setPasswordHash(passwordHasher.hash(PASSWORD));
         existingAdmin.setRole(Role.ADMIN);
         existingAdmin.setEmail(existingAdminLogin + "@test.com");
         existingAdmin.setPhone("+37400110000");
@@ -84,14 +86,14 @@ class RegisterApiITRefactorTest {
         String requestBody = """
                 {
                   "login": "%s",
-                  "password": "12345678",
+                  "password": "%s",
                   "role": "USER",
                   "email": "%s@test.com",
                   "phone": "+37400112233"
                 }
-                """.formatted(userLogin, userLogin);
+                """.formatted(userLogin, PASSWORD, userLogin);
 
-        ResponseEntity<String> response = postJson("/auth/register", requestBody);
+        ResponseEntity<String> response = postRegisterJson(requestBody);
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -107,14 +109,14 @@ class RegisterApiITRefactorTest {
         String requestBody = """
                 {
                   "login": "%s",
-                  "password": "12345678",
+                  "password": "%s",
                   "role": "USER",
                   "email": "%s@test.com",
                   "phone": "+37400112233"
                 }
-                """.formatted(duplicateLogin, duplicateLogin);
+                """.formatted(duplicateLogin, PASSWORD, duplicateLogin);
 
-        ResponseEntity<String> response = postJson("/auth/register", requestBody);
+        ResponseEntity<String> response = postRegisterJson(requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -128,14 +130,14 @@ class RegisterApiITRefactorTest {
         String requestBody = """
                 {
                   "login": "%s",
-                  "password": "12345678",
+                  "password": "%s",
                   "role": "ADMIN",
                   "email": "%s@test.com",
                   "phone": "+37400110000"
                 }
-                """.formatted(secondAdminLogin, secondAdminLogin);
+                """.formatted(secondAdminLogin, PASSWORD, secondAdminLogin);
 
-        ResponseEntity<String> response = postJson("/auth/register", requestBody);
+        ResponseEntity<String> response = postRegisterJson(requestBody);
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -145,12 +147,12 @@ class RegisterApiITRefactorTest {
         assertFalse(userExistsByLogin(secondAdminLogin));
     }
 
-    private ResponseEntity<String> postJson(String url, String requestBody) {
+    private ResponseEntity<String> postRegisterJson(String requestBody) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
-        return restTemplate.postForEntity(url, entity, String.class);
+        return restTemplate.postForEntity("/auth/register", entity, String.class);
     }
 
     private boolean userExistsByLogin(String login) {

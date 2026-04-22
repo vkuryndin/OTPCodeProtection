@@ -32,6 +32,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class OtpApiITRefactorTest {
 
+    private static final String PASSWORD = "12345678";
+    private static final int DEFAULT_CODE_LENGTH = 6;
+
     @Autowired
     private TestRestTemplate restTemplate;
 
@@ -45,7 +48,6 @@ class OtpApiITRefactorTest {
     private ObjectMapper objectMapper;
 
     private String testLogin;
-    private final String testPassword = "12345678";
     private Path otpFile;
 
     @BeforeEach
@@ -60,23 +62,21 @@ class OtpApiITRefactorTest {
 
         User user = new User();
         user.setLogin(testLogin);
-        user.setPasswordHash(passwordHasher.hash(testPassword));
+        user.setPasswordHash(passwordHasher.hash(PASSWORD));
         user.setRole(Role.USER);
         user.setEmail(testLogin + "@test.com");
         user.setPhone("+37400112233");
 
         userRepository.createUser(user);
 
-        upsertOtpConfig(6, 300);
+        resetOtpConfig();
     }
 
     @AfterEach
     void tearDown() throws IOException {
         deleteUserByLogin(testLogin);
         Files.deleteIfExists(otpFile);
-
-        // Возвращаем стандартный конфиг обратно
-        upsertOtpConfig(6, 300);
+        resetOtpConfig();
     }
 
     @Test
@@ -104,7 +104,7 @@ class OtpApiITRefactorTest {
         String code = readLastCodeFromFile(otpFile);
 
         assertNotNull(code);
-        assertEquals(6, code.length());
+        assertEquals(DEFAULT_CODE_LENGTH, code.length());
     }
 
     @Test
@@ -172,7 +172,7 @@ class OtpApiITRefactorTest {
 
     @Test
     void validateOtp_shouldReturnBadRequest_whenCodeIsExpired() throws Exception {
-        upsertOtpConfig(6, 1);
+        setOtpTtlSeconds(1);
 
         String token = loginAndGetToken();
         String operationId = "payment-file-expired-001";
@@ -197,7 +197,7 @@ class OtpApiITRefactorTest {
     private String loginAndGetToken() throws Exception {
         LoginRequest request = new LoginRequest();
         request.setLogin(testLogin);
-        request.setPassword(testPassword);
+        request.setPassword(PASSWORD);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -271,7 +271,11 @@ class OtpApiITRefactorTest {
         }
     }
 
-    private void upsertOtpConfig(int codeLength, int ttlSeconds) {
+    private void resetOtpConfig() {
+        setOtpTtlSeconds(300);
+    }
+
+    private void setOtpTtlSeconds(int ttlSeconds) {
         String sql = """
                 INSERT INTO otp_config (id, code_length, ttl_seconds, updated_at)
                 VALUES (1, ?, ?, CURRENT_TIMESTAMP)
@@ -285,11 +289,11 @@ class OtpApiITRefactorTest {
         try (Connection connection = ConnectionFactory.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            statement.setInt(1, codeLength);
+            statement.setInt(1, DEFAULT_CODE_LENGTH);
             statement.setInt(2, ttlSeconds);
             statement.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to upsert OTP config", e);
+            throw new RuntimeException("Failed to update OTP config", e);
         }
     }
 }

@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class OtpRequestValidationApiITTest {
 
+    private static final String PASSWORD = "12345678";
+
     @Autowired
     private TestRestTemplate restTemplate;
 
@@ -40,7 +42,6 @@ class OtpRequestValidationApiITTest {
     private ObjectMapper objectMapper;
 
     private String testLogin;
-    private final String testPassword = "12345678";
 
     @BeforeEach
     void setUp() {
@@ -50,7 +51,7 @@ class OtpRequestValidationApiITTest {
 
         User user = new User();
         user.setLogin(testLogin);
-        user.setPasswordHash(passwordHasher.hash(testPassword));
+        user.setPasswordHash(passwordHasher.hash(PASSWORD));
         user.setRole(Role.USER);
         user.setEmail(testLogin + "@test.com");
         user.setPhone("+37400112233");
@@ -58,13 +59,13 @@ class OtpRequestValidationApiITTest {
 
         userRepository.createUser(user);
 
-        upsertOtpConfig(6, 300);
+        resetOtpConfig();
     }
 
     @AfterEach
     void tearDown() {
         deleteUserByLogin(testLogin);
-        upsertOtpConfig(6, 300);
+        resetOtpConfig();
     }
 
     @Test
@@ -148,7 +149,7 @@ class OtpRequestValidationApiITTest {
     private String loginAndGetToken() throws Exception {
         LoginRequest request = new LoginRequest();
         request.setLogin(testLogin);
-        request.setPassword(testPassword);
+        request.setPassword(PASSWORD);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -187,10 +188,10 @@ class OtpRequestValidationApiITTest {
         }
     }
 
-    private void upsertOtpConfig(int codeLength, int ttlSeconds) {
+    private void resetOtpConfig() {
         String sql = """
                 INSERT INTO otp_config (id, code_length, ttl_seconds, updated_at)
-                VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (1, 6, 300, CURRENT_TIMESTAMP)
                 ON CONFLICT (id)
                 DO UPDATE SET
                     code_length = EXCLUDED.code_length,
@@ -201,11 +202,9 @@ class OtpRequestValidationApiITTest {
         try (Connection connection = ConnectionFactory.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            statement.setInt(1, codeLength);
-            statement.setInt(2, ttlSeconds);
             statement.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to upsert OTP config", e);
+            throw new RuntimeException("Failed to reset OTP config", e);
         }
     }
 }

@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class RegisterValidationApiIT {
+class RegisterValidationApiITTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
@@ -36,7 +36,7 @@ class RegisterValidationApiIT {
                 }
                 """;
 
-        ResponseEntity<String> response = postJson("/auth/register", requestBody);
+        ResponseEntity<String> response = postRegisterJson(requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -57,7 +57,7 @@ class RegisterValidationApiIT {
                 }
                 """;
 
-        ResponseEntity<String> response = postJson("/auth/register", requestBody);
+        ResponseEntity<String> response = postRegisterJson(requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -78,7 +78,7 @@ class RegisterValidationApiIT {
                 }
                 """;
 
-        ResponseEntity<String> response = postJson("/auth/register", requestBody);
+        ResponseEntity<String> response = postRegisterJson(requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -101,7 +101,7 @@ class RegisterValidationApiIT {
                 }
                 """.formatted(login);
 
-        ResponseEntity<String> response = postJson("/auth/register", requestBody);
+        ResponseEntity<String> response = postRegisterJson(requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -146,12 +146,12 @@ class RegisterValidationApiIT {
         assertEquals("Request body is invalid", body.get("error").asText());
     }
 
-    private ResponseEntity<String> postJson(String url, String requestBody) {
+    private ResponseEntity<String> postRegisterJson(String requestBody) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
-        return restTemplate.postForEntity(url, entity, String.class);
+        return restTemplate.postForEntity("/auth/register", entity, String.class);
     }
 
     private void deleteUserByLogin(String login) {
