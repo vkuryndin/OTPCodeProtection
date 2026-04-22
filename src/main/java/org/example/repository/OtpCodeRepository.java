@@ -47,6 +47,8 @@ public class OtpCodeRepository {
                 used_at = CURRENT_TIMESTAMP
             FROM candidate
             WHERE o.id = candidate.id
+              AND o.status = 'ACTIVE'
+              AND o.expires_at >= CURRENT_TIMESTAMP
             RETURNING o.id,
                       o.user_id,
                       o.operation_id,

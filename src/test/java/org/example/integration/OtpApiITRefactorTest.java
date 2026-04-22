@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.UUID;
 
@@ -48,6 +49,7 @@ class OtpApiITRefactorTest {
     private ObjectMapper objectMapper;
 
     private String testLogin;
+    private Long testUserId;
     private Path otpFile;
 
     @BeforeEach
@@ -66,8 +68,9 @@ class OtpApiITRefactorTest {
         user.setRole(Role.USER);
         user.setEmail(testLogin + "@test.com");
         user.setPhone("+37400112233");
+        user.setTelegramChatId("123456789");
 
-        userRepository.createUser(user);
+        testUserId = userRepository.createUser(user);
 
         resetOtpConfig();
     }
@@ -172,7 +175,7 @@ class OtpApiITRefactorTest {
 
     @Test
     void validateOtp_shouldReturnBadRequest_whenCodeIsExpired() throws Exception {
-        setOtpTtlSeconds(1);
+        setOtpConfig(DEFAULT_CODE_LENGTH, 1);
 
         String token = loginAndGetToken();
         String operationId = "payment-file-expired-001";
@@ -192,6 +195,42 @@ class OtpApiITRefactorTest {
 
         JsonNode body = objectMapper.readTree(response.getBody());
         assertEquals("Invalid or expired OTP code", body.get("error").asText());
+    }
+
+    @Test
+    void generateOtp_shouldExpirePreviousActiveCode_whenSameOperationIdIsUsedAgain() throws Exception {
+        setOtpConfig(10, 300);
+
+        String token = loginAndGetToken();
+        String operationId = "payment-file-repeat-001";
+
+        String firstCode = generateOtpAndReadCode(token, operationId);
+        String secondCode = generateOtpAndReadCode(token, operationId);
+
+        assertNotEquals(firstCode, secondCode);
+
+        assertEquals(1, countOtpCodesByStatus(testUserId, operationId, "ACTIVE"));
+        assertEquals(1, countOtpCodesByStatus(testUserId, operationId, "EXPIRED"));
+
+        ValidateOtpRequest firstRequest = new ValidateOtpRequest();
+        firstRequest.setOperationId(operationId);
+        firstRequest.setCode(firstCode);
+
+        ResponseEntity<String> firstValidation = postAuthorized("/otp/validate", token, firstRequest);
+        assertEquals(HttpStatus.BAD_REQUEST, firstValidation.getStatusCode());
+
+        JsonNode firstBody = objectMapper.readTree(firstValidation.getBody());
+        assertEquals("Invalid or expired OTP code", firstBody.get("error").asText());
+
+        ValidateOtpRequest secondRequest = new ValidateOtpRequest();
+        secondRequest.setOperationId(operationId);
+        secondRequest.setCode(secondCode);
+
+        ResponseEntity<String> secondValidation = postAuthorized("/otp/validate", token, secondRequest);
+        assertEquals(HttpStatus.OK, secondValidation.getStatusCode());
+
+        JsonNode secondBody = objectMapper.readTree(secondValidation.getBody());
+        assertEquals("OTP validated successfully", secondBody.get("message").asText());
     }
 
     private String loginAndGetToken() throws Exception {
@@ -258,6 +297,31 @@ class OtpApiITRefactorTest {
         return lastLine.substring(valueStart, valueEnd).trim();
     }
 
+    private long countOtpCodesByStatus(Long userId, String operationId, String status) {
+        String sql = """
+                SELECT COUNT(*)
+                FROM otp_codes
+                WHERE user_id = ?
+                  AND operation_id = ?
+                  AND status = ?::otp_status
+                """;
+
+        try (Connection connection = ConnectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, userId);
+            statement.setString(2, operationId);
+            statement.setString(3, status);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to count OTP codes by status", e);
+        }
+    }
+
     private void deleteUserByLogin(String login) {
         String sql = "DELETE FROM users WHERE login = ?";
 
@@ -272,10 +336,10 @@ class OtpApiITRefactorTest {
     }
 
     private void resetOtpConfig() {
-        setOtpTtlSeconds(300);
+        setOtpConfig(DEFAULT_CODE_LENGTH, 300);
     }
 
-    private void setOtpTtlSeconds(int ttlSeconds) {
+    private void setOtpConfig(int codeLength, int ttlSeconds) {
         String sql = """
                 INSERT INTO otp_config (id, code_length, ttl_seconds, updated_at)
                 VALUES (1, ?, ?, CURRENT_TIMESTAMP)
@@ -289,7 +353,7 @@ class OtpApiITRefactorTest {
         try (Connection connection = ConnectionFactory.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            statement.setInt(1, DEFAULT_CODE_LENGTH);
+            statement.setInt(1, codeLength);
             statement.setInt(2, ttlSeconds);
             statement.executeUpdate();
         } catch (SQLException e) {

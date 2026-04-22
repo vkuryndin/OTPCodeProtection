@@ -3,9 +3,10 @@ package org.example.service;
 import org.example.exception.RateLimitExceededException;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import java.lang.reflect.Field;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 class GenerateOtpRateLimitServiceTest {
 
@@ -33,5 +34,26 @@ class GenerateOtpRateLimitServiceTest {
         );
 
         assertEquals("Too many OTP generation requests. Try again later.", exception.getMessage());
+    }
+
+    @Test
+    void cleanupExpiredWindows_shouldRemoveExpiredEntries() throws Exception {
+        GenerateOtpRateLimitService service = new GenerateOtpRateLimitService(true, 5, 1);
+
+        service.validateAndRegisterAttempt(1L);
+        assertEquals(1, getAttemptsMap(service).size());
+
+        Thread.sleep(1100);
+
+        service.cleanupExpiredWindows();
+
+        assertTrue(getAttemptsMap(service).isEmpty());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<Long, ?> getAttemptsMap(GenerateOtpRateLimitService service) throws Exception {
+        Field field = GenerateOtpRateLimitService.class.getDeclaredField("attemptsByUserId");
+        field.setAccessible(true);
+        return (Map<Long, ?>) field.get(service);
     }
 }
