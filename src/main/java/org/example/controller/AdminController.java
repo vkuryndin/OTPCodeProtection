@@ -20,8 +20,6 @@ import java.util.stream.Collectors;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.example.model.OtpConfig;
-import org.example.model.Role;
-import org.example.repository.OtpConfigRepository;
 import org.example.service.TokenService;
 
 import org.slf4j.Logger;

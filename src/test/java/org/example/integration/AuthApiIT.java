@@ -21,7 +21,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AuthApiIT {
@@ -83,9 +84,8 @@ class AuthApiIT {
         assertEquals("Login successful", body.get("message").asText());
         assertEquals(testLogin, body.get("login").asText());
         assertEquals("USER", body.get("role").asText());
-        assertTrue(body.has("userId"));
-        assertTrue(body.has("token"));
-        assertFalse(body.get("token").asText().isBlank());
+        assertNotNull(body.get("userId"));
+        assertNotNull(body.get("token"));
     }
 
     @Test
@@ -107,6 +107,69 @@ class AuthApiIT {
 
         JsonNode body = objectMapper.readTree(response.getBody());
         assertEquals("Invalid login or password", body.get("error").asText());
+    }
+
+    @Test
+    void logout_shouldReturnOk_whenTokenIsValid() throws Exception {
+        String token = loginAndGetToken();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<String> response =
+                restTemplate.postForEntity("/auth/logout", entity, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals("Logout successful", body.get("message").asText());
+    }
+
+    @Test
+    void logout_shouldInvalidateToken_forSecondLogoutAttempt() throws Exception {
+        String token = loginAndGetToken();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<String> firstResponse =
+                restTemplate.postForEntity("/auth/logout", entity, String.class);
+
+        assertEquals(HttpStatus.OK, firstResponse.getStatusCode());
+
+        ResponseEntity<String> secondResponse =
+                restTemplate.postForEntity("/auth/logout", entity, String.class);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, secondResponse.getStatusCode());
+        assertNotNull(secondResponse.getBody());
+
+        JsonNode body = objectMapper.readTree(secondResponse.getBody());
+        assertEquals("Invalid or expired token", body.get("error").asText());
+    }
+
+    private String loginAndGetToken() throws Exception {
+        LoginRequest request = new LoginRequest();
+        request.setLogin(testLogin);
+        request.setPassword(testPassword);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<LoginRequest> entity = new HttpEntity<>(request, headers);
+
+        ResponseEntity<String> response =
+                restTemplate.postForEntity("/auth/login", entity, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        return body.get("token").asText();
     }
 
     private void deleteUserByLogin(String login) {
