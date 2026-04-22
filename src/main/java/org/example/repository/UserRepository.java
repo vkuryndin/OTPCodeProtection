@@ -62,7 +62,7 @@ public class UserRepository {
             SET telegram_bind_token = ?, telegram_bind_expires_at = ?
             WHERE id = ?
             """;
-    
+
     private static final String BIND_TELEGRAM_CHAT_ID_SQL = """
             UPDATE users
             SET telegram_chat_id = ?, telegram_bind_token = NULL, telegram_bind_expires_at = NULL
