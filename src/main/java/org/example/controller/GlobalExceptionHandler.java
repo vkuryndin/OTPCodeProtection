@@ -1,6 +1,8 @@
 package org.example.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.example.exception.NotFoundException;
+import org.example.exception.UnauthorizedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -16,31 +18,33 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, Object>> handleUnauthorized(UnauthorizedException e,
+                                                                  HttpServletRequest request) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("error", e.getMessage());
+
+        log.warn("HTTP 401: {} {} -> {}", request.getMethod(), request.getRequestURI(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(NotFoundException e,
+                                                              HttpServletRequest request) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("error", e.getMessage());
+
+        log.warn("HTTP 404: {} {} -> {}", request.getMethod(), request.getRequestURI(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e,
                                                                 HttpServletRequest request) {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("error", e.getMessage());
 
-        String message = e.getMessage();
-
-        if ("Authorization header is required".equals(message)
-                || "Invalid authorization format".equals(message)
-                || "Token is required".equals(message)
-                || "Invalid or expired token".equals(message)) {
-
-            log.warn("HTTP 401: {} {} -> {}", request.getMethod(), request.getRequestURI(), message);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-        }
-
-        if ("User not found".equals(message)
-                || "OTP config not found".equals(message)) {
-
-            log.warn("HTTP 404: {} {} -> {}", request.getMethod(), request.getRequestURI(), message);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
-
-        log.warn("HTTP 400: {} {} -> {}", request.getMethod(), request.getRequestURI(), message);
+        log.warn("HTTP 400: {} {} -> {}", request.getMethod(), request.getRequestURI(), e.getMessage());
         return ResponseEntity.badRequest().body(response);
     }
 

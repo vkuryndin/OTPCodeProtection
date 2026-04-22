@@ -16,15 +16,18 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class AdminApiIT {
+class OtpAuthApiITTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
@@ -38,126 +41,130 @@ class AdminApiIT {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private String adminLogin;
-    private String userLogin;
-
-    private final String adminPassword = "12345678";
-    private final String userPassword = "12345678";
+    private String testLogin;
+    private final String testPassword = "12345678";
+    private Path otpFile;
 
     @BeforeEach
-    void setUp() {
-        adminLogin = "it_admin_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        userLogin = "it_user_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    void setUp() throws Exception {
+        testLogin = "it_otp_auth_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        otpFile = Path.of("build", "test-otp", "otp-auth-" + testLogin + ".txt");
 
-        deleteUserByLogin(adminLogin);
-        deleteUserByLogin(userLogin);
+        Files.createDirectories(otpFile.getParent());
+        Files.deleteIfExists(otpFile);
 
-        User admin = new User();
-        admin.setLogin(adminLogin);
-        admin.setPasswordHash(passwordHasher.hash(adminPassword));
-        admin.setRole(Role.ADMIN);
-        admin.setEmail(adminLogin + "@test.com");
-        admin.setPhone("+37400110000");
-        userRepository.createUser(admin);
+        deleteUserByLogin(testLogin);
 
         User user = new User();
-        user.setLogin(userLogin);
-        user.setPasswordHash(passwordHasher.hash(userPassword));
+        user.setLogin(testLogin);
+        user.setPasswordHash(passwordHasher.hash(testPassword));
         user.setRole(Role.USER);
-        user.setEmail(userLogin + "@test.com");
+        user.setEmail(testLogin + "@test.com");
         user.setPhone("+37400112233");
+
         userRepository.createUser(user);
 
         upsertOtpConfig(6, 300);
     }
 
     @AfterEach
-    void tearDown() {
-        deleteUserByLogin(userLogin);
-        deleteUserByLogin(adminLogin);
+    void tearDown() throws Exception {
+        deleteUserByLogin(testLogin);
+        Files.deleteIfExists(otpFile);
         upsertOtpConfig(6, 300);
     }
 
     @Test
-    void getOtpConfig_shouldReturnConfig_forAdmin() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(adminToken);
-
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<String> response =
-                restTemplate.exchange("/admin/otp-config", HttpMethod.GET, entity, String.class);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals(1, body.get("id").asInt());
-        assertEquals(6, body.get("codeLength").asInt());
-        assertEquals(300, body.get("ttlSeconds").asInt());
-    }
-
-    @Test
-    void updateOtpConfig_shouldUpdateValues_forAdmin() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin, adminPassword);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(adminToken);
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
+    void generateOtp_shouldReturnUnauthorized_whenTokenIsMissing() throws Exception {
         String requestBody = """
                 {
-                  "codeLength": 8,
-                  "ttlSeconds": 120
+                  "operationId": "payment-auth-missing-token-001",
+                  "deliveryChannel": "FILE",
+                  "deliveryTarget": "%s"
                 }
-                """;
+                """.formatted(escapeBackslashes(otpFile.toString()));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
 
         ResponseEntity<String> response =
-                restTemplate.exchange("/admin/otp-config", HttpMethod.PUT, entity, String.class);
+                restTemplate.postForEntity("/otp/generate", entity, String.class);
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
         assertNotNull(response.getBody());
 
         JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("OTP config updated successfully", body.get("message").asText());
-        assertEquals(8, body.get("codeLength").asInt());
-        assertEquals(120, body.get("ttlSeconds").asInt());
-
-        ResponseEntity<String> checkResponse =
-                restTemplate.exchange("/admin/otp-config", HttpMethod.GET, new HttpEntity<>(headers), String.class);
-
-        JsonNode checkBody = objectMapper.readTree(checkResponse.getBody());
-        assertEquals(8, checkBody.get("codeLength").asInt());
-        assertEquals(120, checkBody.get("ttlSeconds").asInt());
+        assertEquals("Authorization header is required", body.get("error").asText());
     }
 
     @Test
-    void getOtpConfig_shouldReturnForbidden_forUser() throws Exception {
-        String userToken = loginAndGetToken(userLogin, userPassword);
+    void validateOtp_shouldReturnUnauthorized_whenTokenIsMissing() throws Exception {
+        String requestBody = """
+                {
+                  "operationId": "payment-auth-validate-001",
+                  "code": "123456"
+                }
+                """;
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(userToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
 
         ResponseEntity<String> response =
-                restTemplate.exchange("/admin/otp-config", HttpMethod.GET, entity, String.class);
+                restTemplate.postForEntity("/otp/validate", entity, String.class);
 
-        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
         assertNotNull(response.getBody());
 
         JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("Access denied", body.get("error").asText());
+        assertEquals("Authorization header is required", body.get("error").asText());
     }
 
-    private String loginAndGetToken(String login, String password) throws Exception {
+    @Test
+    void generateOtp_shouldReturnUnauthorized_afterLogout() throws Exception {
+        String token = loginAndGetToken();
+
+        HttpHeaders logoutHeaders = new HttpHeaders();
+        logoutHeaders.setBearerAuth(token);
+
+        HttpEntity<Void> logoutEntity = new HttpEntity<>(logoutHeaders);
+
+        ResponseEntity<String> logoutResponse =
+                restTemplate.postForEntity("/auth/logout", logoutEntity, String.class);
+
+        assertEquals(HttpStatus.OK, logoutResponse.getStatusCode());
+
+        String requestBody = """
+                {
+                  "operationId": "payment-after-logout-001",
+                  "deliveryChannel": "FILE",
+                  "deliveryTarget": "%s"
+                }
+                """.formatted(escapeBackslashes(otpFile.toString()));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(token);
+
+        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
+
+        ResponseEntity<String> response =
+                restTemplate.postForEntity("/otp/generate", entity, String.class);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals("Invalid or expired token", body.get("error").asText());
+    }
+
+    private String loginAndGetToken() throws Exception {
         LoginRequest request = new LoginRequest();
-        request.setLogin(login);
-        request.setPassword(password);
+        request.setLogin(testLogin);
+        request.setPassword(testPassword);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -207,5 +214,9 @@ class AdminApiIT {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to upsert OTP config", e);
         }
+    }
+
+    private String escapeBackslashes(String value) {
+        return value.replace("\\", "\\\\");
     }
 }

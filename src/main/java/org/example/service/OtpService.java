@@ -1,20 +1,22 @@
 package org.example.service;
 
 import org.example.dto.GenerateOtpRequest;
+import org.example.dto.OtpGenerationResponse;
+import org.example.dto.OtpValidationResponse;
+import org.example.dto.ValidateOtpRequest;
+import org.example.exception.NotFoundException;
+import org.example.model.DeliveryChannel;
 import org.example.model.OtpCode;
 import org.example.model.OtpConfig;
 import org.example.model.OtpStatus;
+import org.example.model.User;
 import org.example.repository.OtpCodeRepository;
 import org.example.repository.OtpConfigRepository;
 import org.example.repository.UserRepository;
-import org.example.model.User;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import org.example.model.DeliveryChannel;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,13 +50,13 @@ public class OtpService {
         this.userRepository = userRepository;
     }
 
-    public Map<String, Object> generateOtp(Long userId, GenerateOtpRequest request) {
+    public OtpGenerationResponse generateOtp(Long userId, GenerateOtpRequest request) {
         if (request == null) {
             log.warn("OTP generation failed: request body is missing, userId={}", userId);
             throw new IllegalArgumentException("Request body is required");
         }
 
-        if (isBlank(request.getOperationId())) {
+        if (request.getOperationId() == null || request.getOperationId().isBlank()) {
             log.warn("OTP generation failed: operationId is missing, userId={}", userId);
             throw new IllegalArgumentException("Operation ID is required");
         }
@@ -74,7 +76,7 @@ public class OtpService {
         OtpConfig config = otpConfigRepository.getConfig();
         if (config == null) {
             log.error("OTP generation failed: OTP config not found, userId={}", userId);
-            throw new IllegalArgumentException("OTP config not found");
+            throw new NotFoundException("OTP config not found");
         }
 
         if (request.getDeliveryChannel() != DeliveryChannel.FILE
@@ -90,37 +92,7 @@ public class OtpService {
         LocalDateTime expiresAt = now.plusSeconds(config.getTtlSeconds());
         String code = generateNumericCode(config.getCodeLength());
 
-        String actualTarget;
-
-        if (request.getDeliveryChannel() == DeliveryChannel.FILE) {
-            if (isBlank(request.getDeliveryTarget())) {
-                log.warn("OTP generation failed: file target is missing, userId={}, operationId={}",
-                        userId, request.getOperationId());
-                throw new IllegalArgumentException("Delivery target is required");
-            }
-            actualTarget = request.getDeliveryTarget().trim();
-        } else if (request.getDeliveryChannel() == DeliveryChannel.EMAIL) {
-            if (isBlank(user.getEmail())) {
-                log.warn("OTP generation failed: user email is not set, userId={}, login={}",
-                        userId, user.getLogin());
-                throw new IllegalArgumentException("User email is not set");
-            }
-            actualTarget = user.getEmail().trim();
-        } else if (request.getDeliveryChannel() == DeliveryChannel.TELEGRAM) {
-            if (isBlank(user.getTelegramChatId())) {
-                log.warn("OTP generation failed: telegram chat id is not set, userId={}, login={}",
-                        userId, user.getLogin());
-                throw new IllegalArgumentException("User telegram chat id is not set");
-            }
-            actualTarget = user.getTelegramChatId().trim();
-        } else {
-            if (isBlank(user.getPhone())) {
-                log.warn("OTP generation failed: user phone is not set, userId={}, login={}",
-                        userId, user.getLogin());
-                throw new IllegalArgumentException("User phone is not set");
-            }
-            actualTarget = user.getPhone().trim();
-        }
+        String actualTarget = resolveDeliveryTarget(userId, user, request);
 
         OtpCode otpCode = new OtpCode();
         otpCode.setUserId(userId);
@@ -135,39 +107,7 @@ public class OtpService {
         Long otpId = otpCodeRepository.createOtpCode(otpCode);
 
         try {
-            if (request.getDeliveryChannel() == DeliveryChannel.FILE) {
-                fileDeliveryService.saveOtpToFile(
-                        actualTarget,
-                        userId,
-                        otpCode.getOperationId(),
-                        code,
-                        expiresAt
-                );
-            } else if (request.getDeliveryChannel() == DeliveryChannel.EMAIL) {
-                emailDeliveryService.sendOtpEmail(
-                        actualTarget,
-                        userId,
-                        otpCode.getOperationId(),
-                        code,
-                        expiresAt
-                );
-            } else if (request.getDeliveryChannel() == DeliveryChannel.TELEGRAM) {
-                telegramDeliveryService.sendOtpMessage(
-                        actualTarget,
-                        userId,
-                        otpCode.getOperationId(),
-                        code,
-                        expiresAt
-                );
-            } else if (request.getDeliveryChannel() == DeliveryChannel.SMS) {
-                smsDeliveryService.sendOtpSms(
-                        actualTarget,
-                        userId,
-                        otpCode.getOperationId(),
-                        code,
-                        expiresAt
-                );
-            }
+            deliverOtp(otpId, userId, otpCode, code, expiresAt);
         } catch (RuntimeException e) {
             log.error("OTP delivery failed: otpId={}, userId={}, operationId={}, channel={}, error={}",
                     otpId, userId, otpCode.getOperationId(), otpCode.getDeliveryChannel(), e.getMessage());
@@ -177,43 +117,29 @@ public class OtpService {
         log.info("OTP generated successfully: otpId={}, userId={}, operationId={}, channel={}, expiresAt={}",
                 otpId, userId, otpCode.getOperationId(), otpCode.getDeliveryChannel(), expiresAt);
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("message", "OTP generated successfully");
-        response.put("otpId", otpId);
-        response.put("operationId", otpCode.getOperationId());
-        response.put("status", otpCode.getStatus());
-        response.put("deliveryChannel", otpCode.getDeliveryChannel());
-        response.put("deliveryTarget", otpCode.getDeliveryTarget());
-        response.put("expiresAt", otpCode.getExpiresAt());
-
-        return response;
-    }
-    private String generateNumericCode(int length) {
-        StringBuilder code = new StringBuilder();
-
-        for (int i = 0; i < length; i++) {
-            code.append(secureRandom.nextInt(10));
-        }
-
-        return code.toString();
+        return new OtpGenerationResponse(
+                "OTP generated successfully",
+                otpId,
+                otpCode.getOperationId(),
+                otpCode.getStatus(),
+                otpCode.getDeliveryChannel(),
+                otpCode.getDeliveryTarget(),
+                otpCode.getExpiresAt()
+        );
     }
 
-    private boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
-
-    public Map<String, Object> validateOtp(Long userId, org.example.dto.ValidateOtpRequest request) {
+    public OtpValidationResponse validateOtp(Long userId, ValidateOtpRequest request) {
         if (request == null) {
             log.warn("OTP validation failed: request body is missing, userId={}", userId);
             throw new IllegalArgumentException("Request body is required");
         }
 
-        if (isBlank(request.getOperationId())) {
+        if (request.getOperationId() == null || request.getOperationId().isBlank()) {
             log.warn("OTP validation failed: operationId is missing, userId={}", userId);
             throw new IllegalArgumentException("Operation ID is required");
         }
 
-        if (isBlank(request.getCode())) {
+        if (request.getCode() == null || request.getCode().isBlank()) {
             log.warn("OTP validation failed: OTP code is missing, userId={}, operationId={}",
                     userId, request.getOperationId());
             throw new IllegalArgumentException("OTP code is required");
@@ -243,12 +169,113 @@ public class OtpService {
         log.info("OTP validated successfully: otpId={}, userId={}, operationId={}",
                 otpCode.getId(), userId, otpCode.getOperationId());
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("message", "OTP validated successfully");
-        response.put("otpId", otpCode.getId());
-        response.put("operationId", otpCode.getOperationId());
-        response.put("status", OtpStatus.USED);
+        return new OtpValidationResponse(
+                "OTP validated successfully",
+                otpCode.getId(),
+                otpCode.getOperationId(),
+                OtpStatus.USED
+        );
+    }
 
-        return response;
+    private String generateNumericCode(int length) {
+        StringBuilder code = new StringBuilder();
+
+        for (int i = 0; i < length; i++) {
+            code.append(secureRandom.nextInt(10));
+        }
+
+        return code.toString();
+    }
+
+    private void deliverOtp(Long otpId,
+                            Long userId,
+                            OtpCode otpCode,
+                            String code,
+                            LocalDateTime expiresAt) {
+        switch (otpCode.getDeliveryChannel()) {
+            case FILE -> fileDeliveryService.saveOtpToFile(
+                    otpCode.getDeliveryTarget(),
+                    userId,
+                    otpCode.getOperationId(),
+                    code,
+                    expiresAt
+            );
+
+            case EMAIL -> emailDeliveryService.sendOtpEmail(
+                    otpCode.getDeliveryTarget(),
+                    userId,
+                    otpCode.getOperationId(),
+                    code,
+                    expiresAt
+            );
+
+            case TELEGRAM -> telegramDeliveryService.sendOtpMessage(
+                    otpCode.getDeliveryTarget(),
+                    userId,
+                    otpCode.getOperationId(),
+                    code,
+                    expiresAt
+            );
+
+            case SMS -> smsDeliveryService.sendOtpSms(
+                    otpCode.getDeliveryTarget(),
+                    userId,
+                    otpCode.getOperationId(),
+                    code,
+                    expiresAt
+            );
+
+            default -> {
+                log.warn("OTP delivery failed: unsupported delivery channel, otpId={}, userId={}, operationId={}, channel={}",
+                        otpId, userId, otpCode.getOperationId(), otpCode.getDeliveryChannel());
+                throw new IllegalArgumentException("Delivery channel is not supported yet");
+            }
+        }
+    }
+
+    private String resolveDeliveryTarget(Long userId, User user, GenerateOtpRequest request) {
+        return switch (request.getDeliveryChannel()) {
+            case FILE -> {
+                if (request.getDeliveryTarget() == null || request.getDeliveryTarget().isBlank()) {
+                    log.warn("OTP generation failed: file target is missing, userId={}, operationId={}",
+                            userId, request.getOperationId());
+                    throw new IllegalArgumentException("Delivery target is required");
+                }
+                yield request.getDeliveryTarget().trim();
+            }
+
+            case EMAIL -> {
+                if (user.getEmail() == null || user.getEmail().isBlank()) {
+                    log.warn("OTP generation failed: user email is not set, userId={}, login={}",
+                            userId, user.getLogin());
+                    throw new IllegalArgumentException("User email is not set");
+                }
+                yield user.getEmail().trim();
+            }
+
+            case TELEGRAM -> {
+                if (user.getTelegramChatId() == null || user.getTelegramChatId().isBlank()) {
+                    log.warn("OTP generation failed: telegram chat id is not set, userId={}, login={}",
+                            userId, user.getLogin());
+                    throw new IllegalArgumentException("User telegram chat id is not set");
+                }
+                yield user.getTelegramChatId().trim();
+            }
+
+            case SMS -> {
+                if (user.getPhone() == null || user.getPhone().isBlank()) {
+                    log.warn("OTP generation failed: user phone is not set, userId={}, login={}",
+                            userId, user.getLogin());
+                    throw new IllegalArgumentException("User phone is not set");
+                }
+                yield user.getPhone().trim();
+            }
+
+            default -> {
+                log.warn("OTP generation failed: unsupported delivery channel, userId={}, operationId={}, channel={}",
+                        userId, request.getOperationId(), request.getDeliveryChannel());
+                throw new IllegalArgumentException("Delivery channel is not supported yet");
+            }
+        };
     }
 }

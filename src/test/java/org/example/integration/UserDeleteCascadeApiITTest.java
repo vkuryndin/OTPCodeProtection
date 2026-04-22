@@ -30,7 +30,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class UserDeleteCascadeApiIT {
+class UserDeleteCascadeApiITTest {
 
     @Autowired
     private TestRestTemplate restTemplate;

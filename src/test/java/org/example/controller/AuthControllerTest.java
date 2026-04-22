@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.dto.LoginRequest;
 import org.example.model.Role;
 import org.example.model.User;
+import org.example.security.AuthUtil;
 import org.example.service.AuthService;
 import org.example.service.TokenService;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,8 @@ class AuthControllerTest {
     @MockBean
     private TokenService tokenService;
 
+    @MockBean
+    private AuthUtil authUtil;
     @Test
     void login_shouldReturnToken_whenCredentialsAreValid() throws Exception {
         LoginRequest request = new LoginRequest();

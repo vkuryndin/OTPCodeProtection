@@ -3,6 +3,9 @@ package org.example.service;
 import org.example.model.Role;
 import org.example.model.User;
 import org.junit.jupiter.api.Test;
+import org.example.exception.UnauthorizedException;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -57,18 +60,16 @@ class TokenServiceTest {
     @Test
     void revokedToken_shouldBecomeInvalid() {
         User user = new User();
-        user.setId(25L);
-        user.setLogin("user3");
+        user.setId(1L);
+        user.setLogin("testuser");
         user.setRole(Role.USER);
 
         String token = tokenService.generateToken(user);
         tokenService.revokeToken(token);
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> tokenService.extractUserId(token)
-        );
+        UnauthorizedException ex =
+                assertThrows(UnauthorizedException.class, () -> tokenService.extractUserId(token));
 
-        assertEquals("Invalid or expired token", exception.getMessage());
+        assertEquals("Invalid or expired token", ex.getMessage());
     }
 }

@@ -1,44 +1,28 @@
 package org.example.service;
 
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
 import org.example.repository.OtpCodeRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class OtpExpirationService {
 
+    private static final Logger log = LoggerFactory.getLogger(OtpExpirationService.class);
+
     private final OtpCodeRepository otpCodeRepository;
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     public OtpExpirationService(OtpCodeRepository otpCodeRepository) {
         this.otpCodeRepository = otpCodeRepository;
     }
 
-    @PostConstruct
-    public void start() {
-        scheduler.scheduleAtFixedRate(
-                this::expireCodesSafely,
-                0,
-                30,
-                TimeUnit.SECONDS
-        );
-    }
-
-    private void expireCodesSafely() {
+    @Scheduled(fixedRate = 30000)
+    public void expireCodes() {
         try {
             otpCodeRepository.expireActiveCodes();
         } catch (Exception e) {
-            System.err.println("Failed to expire OTP codes: " + e.getMessage());
+            log.error("Failed to expire OTP codes", e);
         }
-    }
-
-    @PreDestroy
-    public void stop() {
-        scheduler.shutdown();
     }
 }

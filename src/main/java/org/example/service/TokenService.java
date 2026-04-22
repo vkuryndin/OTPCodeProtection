@@ -3,6 +3,7 @@ package org.example.service;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.example.exception.UnauthorizedException;
 import org.example.model.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -73,7 +74,7 @@ public class TokenService {
 
     private Claims parseClaims(String token) {
         if (revokedTokens.contains(token)) {
-            throw new IllegalArgumentException("Invalid or expired token");
+            throw new UnauthorizedException("Invalid or expired token");
         }
 
         try {
@@ -83,7 +84,7 @@ public class TokenService {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid or expired token");
+            throw new UnauthorizedException("Invalid or expired token");
         }
     }
 

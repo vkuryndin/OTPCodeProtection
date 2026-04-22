@@ -1,27 +1,23 @@
 package org.example.service;
 
-import org.example.model.User;
-import org.example.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.model.User;
+import org.example.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class TelegramBindingService {
@@ -30,7 +26,6 @@ public class TelegramBindingService {
     private final EmailDeliveryService emailDeliveryService;
     private final String botUsername;
     private final long bindExpirationMinutes;
-
     private final String telegramApiUrl;
     private final String botToken;
     private final HttpClient httpClient = HttpClient.newHttpClient();
@@ -58,7 +53,7 @@ public class TelegramBindingService {
             throw new IllegalArgumentException("User not found");
         }
 
-        if (isBlank(user.getEmail())) {
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
             log.warn("Telegram bind start failed: email is not set, userId={}, login={}",
                     userId, user.getLogin());
             throw new IllegalArgumentException("User email is not set");
@@ -91,7 +86,7 @@ public class TelegramBindingService {
             throw new IllegalArgumentException("User not found");
         }
 
-        if (isBlank(user.getTelegramBindToken())) {
+        if (user.getTelegramBindToken() == null || user.getTelegramBindToken().isBlank()) {
             log.warn("Telegram bind complete failed: bind token is not set, userId={}, login={}",
                     userId, user.getLogin());
             throw new IllegalArgumentException("Telegram bind token is not set");
@@ -105,7 +100,7 @@ public class TelegramBindingService {
         }
 
         String chatId = findChatIdByBindToken(user.getTelegramBindToken());
-        if (isBlank(chatId)) {
+        if (chatId == null || chatId.isBlank()) {
             log.warn("Telegram bind complete failed: chat id not found, userId={}, login={}",
                     userId, user.getLogin());
             throw new IllegalArgumentException("Telegram chat id not found for bind token");
@@ -122,10 +117,6 @@ public class TelegramBindingService {
         response.put("telegramChatId", chatId);
 
         return response;
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
     }
 
     private String findChatIdByBindToken(String bindToken) {

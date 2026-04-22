@@ -5,11 +5,10 @@ import org.example.model.Role;
 import org.example.model.User;
 import org.example.repository.UserRepository;
 import org.example.security.PasswordHasher;
-import org.springframework.stereotype.Service;
 import org.example.util.AuthValidationUtil;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 @Service
 public class AuthService {
@@ -136,11 +135,7 @@ public class AuthService {
         return user;
     }
 
-    private boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
-    }
-
     private String emptyToNull(String value) {
-        return isBlank(value) ? null : value.trim();
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

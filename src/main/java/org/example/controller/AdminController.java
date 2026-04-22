@@ -1,13 +1,20 @@
 package org.example.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.example.dto.DeleteUserResponse;
 import org.example.dto.UpdateOtpConfigRequest;
+import org.example.dto.UpdateOtpConfigResponse;
+import org.example.dto.UserResponse;
+import org.example.exception.NotFoundException;
+import org.example.model.OtpConfig;
 import org.example.model.Role;
 import org.example.model.User;
 import org.example.repository.OtpConfigRepository;
 import org.example.repository.UserRepository;
 import org.example.security.AuthUtil;
 import org.example.service.TokenService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,15 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.example.dto.UserResponse;
 import java.util.stream.Collectors;
-
-import jakarta.servlet.http.HttpServletRequest;
-import org.example.model.OtpConfig;
-import org.example.service.TokenService;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/admin")
@@ -35,7 +34,10 @@ public class AdminController {
     private final TokenService tokenService;
     private static final Logger log = LoggerFactory.getLogger(AdminController.class);
 
-    public AdminController(UserRepository userRepository, AuthUtil authUtil, OtpConfigRepository otpConfigRepository, TokenService tokenService) {
+    public AdminController(UserRepository userRepository,
+                           AuthUtil authUtil,
+                           OtpConfigRepository otpConfigRepository,
+                           TokenService tokenService) {
         this.userRepository = userRepository;
         this.authUtil = authUtil;
         this.otpConfigRepository = otpConfigRepository;
@@ -45,7 +47,7 @@ public class AdminController {
     @GetMapping("/users")
     public ResponseEntity<List<UserResponse>> getUsers(HttpServletRequest request) {
         requireAdmin(request);
-        Long adminId = tokenService.extractUserId(extractToken(request));
+        Long adminId = tokenService.extractUserId(authUtil.extractToken(request));
 
         List<UserResponse> users = userRepository.findAllNonAdmins()
                 .stream()
@@ -58,15 +60,15 @@ public class AdminController {
     }
 
     @DeleteMapping("/users/{id}")
-    public ResponseEntity<Map<String, Object>> deleteUser(@PathVariable Long id,
-                                                          HttpServletRequest request) {
+    public ResponseEntity<DeleteUserResponse> deleteUser(@PathVariable Long id,
+                                                         HttpServletRequest request) {
         requireAdmin(request);
-        Long adminId = tokenService.extractUserId(extractToken(request));
+        Long adminId = tokenService.extractUserId(authUtil.extractToken(request));
 
         User user = userRepository.findById(id);
         if (user == null) {
             log.warn("Admin delete failed: user not found, adminId={}, targetUserId={}", adminId, id);
-            throw new IllegalArgumentException("User not found");
+            throw new NotFoundException("User not found");
         }
 
         if (user.getRole() == Role.ADMIN) {
@@ -77,15 +79,16 @@ public class AdminController {
         boolean deleted = userRepository.deleteById(id);
         if (!deleted) {
             log.warn("Admin delete failed during delete, adminId={}, targetUserId={}", adminId, id);
-            throw new IllegalArgumentException("User not found");
+            throw new NotFoundException("User not found");
         }
 
         log.info("User deleted by admin: adminId={}, targetUserId={}, targetLogin={}",
                 adminId, id, user.getLogin());
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("message", "User deleted successfully");
-        response.put("userId", id);
+        DeleteUserResponse response = new DeleteUserResponse(
+                "User deleted successfully",
+                id
+        );
 
         return ResponseEntity.ok(response);
     }
@@ -93,7 +96,7 @@ public class AdminController {
     @GetMapping("/otp-config")
     public ResponseEntity<?> getOtpConfig(HttpServletRequest request) {
         requireAdmin(request);
-        Long adminId = tokenService.extractUserId(extractToken(request));
+        Long adminId = tokenService.extractUserId(authUtil.extractToken(request));
 
         OtpConfig config = otpConfigRepository.getConfig();
         if (config == null) {
@@ -108,11 +111,12 @@ public class AdminController {
 
         return ResponseEntity.ok(config);
     }
+
     @PutMapping("/otp-config")
-    public ResponseEntity<Map<String, Object>> updateOtpConfig(@RequestBody UpdateOtpConfigRequest request,
-                                                               HttpServletRequest httpRequest) {
+    public ResponseEntity<UpdateOtpConfigResponse> updateOtpConfig(@RequestBody UpdateOtpConfigRequest request,
+                                                                   HttpServletRequest httpRequest) {
         requireAdmin(httpRequest);
-        Long adminId = tokenService.extractUserId(extractToken(httpRequest));
+        Long adminId = tokenService.extractUserId(authUtil.extractToken(httpRequest));
 
         if (request == null) {
             log.warn("OTP config update failed: request body is missing, adminId={}", adminId);
@@ -154,14 +158,14 @@ public class AdminController {
         log.info("OTP config updated by admin: adminId={}, codeLength={}, ttlSeconds={}",
                 adminId, request.getCodeLength(), request.getTtlSeconds());
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("message", "OTP config updated successfully");
-        response.put("codeLength", request.getCodeLength());
-        response.put("ttlSeconds", request.getTtlSeconds());
+        UpdateOtpConfigResponse response = new UpdateOtpConfigResponse(
+                "OTP config updated successfully",
+                request.getCodeLength(),
+                request.getTtlSeconds()
+        );
 
         return ResponseEntity.ok(response);
     }
-
 
     private UserResponse toUserResponse(User user) {
         return new UserResponse(
@@ -173,10 +177,10 @@ public class AdminController {
                 user.getTelegramChatId(),
                 user.getCreatedAt()
         );
-
     }
+
     private void requireAdmin(HttpServletRequest request) {
-        String token = extractToken(request);
+        String token = authUtil.extractToken(request);
         String role = tokenService.extractRole(token);
 
         if (!Role.ADMIN.name().equals(role)) {
@@ -184,23 +188,4 @@ public class AdminController {
         }
     }
 
-    private String extractToken(HttpServletRequest request) {
-        String authHeader = request.getHeader("Authorization");
-
-        if (authHeader == null || authHeader.isBlank()) {
-            throw new IllegalArgumentException("Authorization header is required");
-        }
-
-        if (!authHeader.startsWith("Bearer ")) {
-            throw new IllegalArgumentException("Invalid authorization format");
-        }
-
-        String token = authHeader.substring("Bearer ".length()).trim();
-
-        if (token.isBlank()) {
-            throw new IllegalArgumentException("Token is required");
-        }
-
-        return token;
-    }
 }
