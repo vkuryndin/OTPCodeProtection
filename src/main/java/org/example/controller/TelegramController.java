@@ -27,19 +27,20 @@ public class TelegramController {
 
     @PostMapping("/bind/start")
     public ResponseEntity<Map<String, Object>> startBinding(HttpServletRequest request) {
-        String token = authUtil.extractToken(request);
-        Long userId = tokenService.extractUserId(token);
-
+        Long userId = extractUserId(request);
         Map<String, Object> response = telegramBindingService.startBinding(userId);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/bind/complete")
     public ResponseEntity<Map<String, Object>> completeBinding(HttpServletRequest request) {
-        String token = authUtil.extractToken(request);
-        Long userId = tokenService.extractUserId(token);
-
+        Long userId = extractUserId(request);
         Map<String, Object> response = telegramBindingService.completeBinding(userId);
         return ResponseEntity.ok(response);
+    }
+
+    private Long extractUserId(HttpServletRequest request) {
+        String token = authUtil.extractToken(request);
+        return tokenService.extractUserId(token);
     }
 }

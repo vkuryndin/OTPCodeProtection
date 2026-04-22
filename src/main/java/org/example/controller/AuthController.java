@@ -20,10 +20,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/auth")
 public class AuthController {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+
     private final AuthService authService;
     private final TokenService tokenService;
     private final AuthUtil authUtil;
-    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     public AuthController(AuthService authService, TokenService tokenService, AuthUtil authUtil) {
         this.authService = authService;
@@ -62,10 +63,9 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<LogoutResponse> logout(HttpServletRequest request) {
         String token = authUtil.extractToken(request);
-
         Long userId = tokenService.extractUserId(token);
-        tokenService.revokeToken(token);
 
+        tokenService.revokeToken(token);
         log.info("Logout successful: userId={}", userId);
 
         LogoutResponse response = new LogoutResponse("Logout successful");

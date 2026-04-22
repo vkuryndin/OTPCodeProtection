@@ -28,11 +28,12 @@ import java.util.stream.Collectors;
 @RequestMapping("/admin")
 public class AdminController {
 
+    private static final Logger log = LoggerFactory.getLogger(AdminController.class);
+
     private final UserRepository userRepository;
     private final AuthUtil authUtil;
     private final OtpConfigRepository otpConfigRepository;
     private final TokenService tokenService;
-    private static final Logger log = LoggerFactory.getLogger(AdminController.class);
 
     public AdminController(UserRepository userRepository,
                            AuthUtil authUtil,
@@ -46,8 +47,7 @@ public class AdminController {
 
     @GetMapping("/users")
     public ResponseEntity<List<UserResponse>> getUsers(HttpServletRequest request) {
-        requireAdmin(request);
-        Long adminId = tokenService.extractUserId(authUtil.extractToken(request));
+        Long adminId = requireAdminAndGetUserId(request);
 
         List<UserResponse> users = userRepository.findAllNonAdmins()
                 .stream()
@@ -62,19 +62,10 @@ public class AdminController {
     @DeleteMapping("/users/{id}")
     public ResponseEntity<DeleteUserResponse> deleteUser(@PathVariable Long id,
                                                          HttpServletRequest request) {
-        requireAdmin(request);
-        Long adminId = tokenService.extractUserId(authUtil.extractToken(request));
+        Long adminId = requireAdminAndGetUserId(request);
 
-        User user = userRepository.findById(id);
-        if (user == null) {
-            log.warn("Admin delete failed: user not found, adminId={}, targetUserId={}", adminId, id);
-            throw new NotFoundException("User not found");
-        }
-
-        if (user.getRole() == Role.ADMIN) {
-            log.warn("Admin delete failed: attempt to delete admin, adminId={}, targetUserId={}", adminId, id);
-            throw new IllegalArgumentException("Admin cannot be deleted");
-        }
+        User user = requireExistingUserForDelete(adminId, id);
+        ensureTargetUserIsNotAdmin(adminId, id, user);
 
         boolean deleted = userRepository.deleteById(id);
         if (!deleted) {
@@ -95,15 +86,12 @@ public class AdminController {
 
     @GetMapping("/otp-config")
     public ResponseEntity<?> getOtpConfig(HttpServletRequest request) {
-        requireAdmin(request);
-        Long adminId = tokenService.extractUserId(authUtil.extractToken(request));
+        Long adminId = requireAdminAndGetUserId(request);
 
         OtpConfig config = otpConfigRepository.getConfig();
         if (config == null) {
             log.warn("Admin requested OTP config but config not found: adminId={}", adminId);
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("error", "OTP config not found");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            return buildOtpConfigNotFoundResponse();
         }
 
         log.info("OTP config fetched by admin: adminId={}, codeLength={}, ttlSeconds={}",
@@ -115,9 +103,66 @@ public class AdminController {
     @PutMapping("/otp-config")
     public ResponseEntity<UpdateOtpConfigResponse> updateOtpConfig(@RequestBody UpdateOtpConfigRequest request,
                                                                    HttpServletRequest httpRequest) {
-        requireAdmin(httpRequest);
-        Long adminId = tokenService.extractUserId(authUtil.extractToken(httpRequest));
+        Long adminId = requireAdminAndGetUserId(httpRequest);
 
+        validateUpdateOtpConfigRequest(request, adminId);
+
+        boolean updated = otpConfigRepository.updateConfig(
+                request.getCodeLength(),
+                request.getTtlSeconds()
+        );
+
+        if (!updated) {
+            log.warn("OTP config update failed: config not found, adminId={}", adminId);
+            throw new IllegalArgumentException("OTP config not found");
+        }
+
+        log.info("OTP config updated by admin: adminId={}, codeLength={}, ttlSeconds={}",
+                adminId, request.getCodeLength(), request.getTtlSeconds());
+
+        UpdateOtpConfigResponse response = new UpdateOtpConfigResponse(
+                "OTP config updated successfully",
+                request.getCodeLength(),
+                request.getTtlSeconds()
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    private Long requireAdminAndGetUserId(HttpServletRequest request) {
+        String token = authUtil.extractToken(request);
+        String role = tokenService.extractRole(token);
+
+        if (!Role.ADMIN.name().equals(role)) {
+            throw new SecurityException("Access denied");
+        }
+
+        return tokenService.extractUserId(token);
+    }
+
+    private User requireExistingUserForDelete(Long adminId, Long targetUserId) {
+        User user = userRepository.findById(targetUserId);
+        if (user == null) {
+            log.warn("Admin delete failed: user not found, adminId={}, targetUserId={}", adminId, targetUserId);
+            throw new NotFoundException("User not found");
+        }
+        return user;
+    }
+
+    private void ensureTargetUserIsNotAdmin(Long adminId, Long targetUserId, User user) {
+        if (user.getRole() == Role.ADMIN) {
+            log.warn("Admin delete failed: attempt to delete admin, adminId={}, targetUserId={}", adminId, targetUserId);
+            throw new IllegalArgumentException("Admin cannot be deleted");
+        }
+    }
+
+    private ResponseEntity<Map<String, Object>> buildOtpConfigNotFoundResponse() {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("error", "OTP config not found");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    private void validateUpdateOtpConfigRequest(UpdateOtpConfigRequest request, Long adminId) {
         if (request == null) {
             log.warn("OTP config update failed: request body is missing, adminId={}", adminId);
             throw new IllegalArgumentException("Request body is required");
@@ -144,27 +189,6 @@ public class AdminController {
                     request.getTtlSeconds(), adminId);
             throw new IllegalArgumentException("TTL seconds must be greater than 0");
         }
-
-        boolean updated = otpConfigRepository.updateConfig(
-                request.getCodeLength(),
-                request.getTtlSeconds()
-        );
-
-        if (!updated) {
-            log.warn("OTP config update failed: config not found, adminId={}", adminId);
-            throw new IllegalArgumentException("OTP config not found");
-        }
-
-        log.info("OTP config updated by admin: adminId={}, codeLength={}, ttlSeconds={}",
-                adminId, request.getCodeLength(), request.getTtlSeconds());
-
-        UpdateOtpConfigResponse response = new UpdateOtpConfigResponse(
-                "OTP config updated successfully",
-                request.getCodeLength(),
-                request.getTtlSeconds()
-        );
-
-        return ResponseEntity.ok(response);
     }
 
     private UserResponse toUserResponse(User user) {
@@ -178,14 +202,4 @@ public class AdminController {
                 user.getCreatedAt()
         );
     }
-
-    private void requireAdmin(HttpServletRequest request) {
-        String token = authUtil.extractToken(request);
-        String role = tokenService.extractRole(token);
-
-        if (!Role.ADMIN.name().equals(role)) {
-            throw new SecurityException("Access denied");
-        }
-    }
-
 }

@@ -29,9 +29,7 @@ public class OtpController {
     @PostMapping("/generate")
     public ResponseEntity<OtpGenerationResponse> generateOtp(@RequestBody GenerateOtpRequest request,
                                                              HttpServletRequest httpRequest) {
-        String token = authUtil.extractToken(httpRequest);
-        Long userId = tokenService.extractUserId(token);
-
+        Long userId = extractUserId(httpRequest);
         OtpGenerationResponse response = otpService.generateOtp(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -39,10 +37,13 @@ public class OtpController {
     @PostMapping("/validate")
     public ResponseEntity<OtpValidationResponse> validateOtp(@RequestBody ValidateOtpRequest request,
                                                              HttpServletRequest httpRequest) {
-        String token = authUtil.extractToken(httpRequest);
-        Long userId = tokenService.extractUserId(token);
-
+        Long userId = extractUserId(httpRequest);
         OtpValidationResponse response = otpService.validateOtp(userId, request);
         return ResponseEntity.ok(response);
+    }
+
+    private Long extractUserId(HttpServletRequest request) {
+        String token = authUtil.extractToken(request);
+        return tokenService.extractUserId(token);
     }
 }
