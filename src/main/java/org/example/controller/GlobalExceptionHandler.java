@@ -22,6 +22,12 @@ public class GlobalExceptionHandler {
     private static final String SMPP_UNAVAILABLE_MESSAGE =
             "SMPP simulator is not available. Start the SMPP server and try again.";
 
+    private static final String TELEGRAM_UNAVAILABLE_MESSAGE =
+            "Telegram API is unavailable. Try again later.";
+
+    private static final String EMAIL_UNAVAILABLE_MESSAGE =
+            "Email service is unavailable. Try again later.";
+
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<Map<String, Object>> handleUnauthorized(UnauthorizedException e,
                                                                   HttpServletRequest request) {
@@ -71,7 +77,7 @@ public class GlobalExceptionHandler {
                                                              HttpServletRequest request) {
         String message = e.getMessage();
 
-        if (isSmppUnavailable(message)) {
+        if (isExternalServiceUnavailable(message)) {
             log.warn("HTTP 503: {} {} -> {}", request.getMethod(), request.getRequestURI(), message);
             return buildErrorResponse(HttpStatus.SERVICE_UNAVAILABLE, message);
         }
@@ -80,9 +86,23 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, message);
     }
 
+    private boolean isExternalServiceUnavailable(String message) {
+        return isSmppUnavailable(message)
+                || isTelegramUnavailable(message)
+                || isEmailUnavailable(message);
+    }
+
     private boolean isSmppUnavailable(String message) {
         return SMPP_UNAVAILABLE_MESSAGE.equals(message)
                 || (message != null && message.startsWith("Cannot connect to SMPP simulator"));
+    }
+
+    private boolean isTelegramUnavailable(String message) {
+        return TELEGRAM_UNAVAILABLE_MESSAGE.equals(message);
+    }
+
+    private boolean isEmailUnavailable(String message) {
+        return EMAIL_UNAVAILABLE_MESSAGE.equals(message);
     }
 
     private String resolveUnreadableMessage(HttpMessageNotReadableException e) {

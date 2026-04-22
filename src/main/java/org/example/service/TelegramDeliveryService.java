@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Service
 public class TelegramDeliveryService {
@@ -53,22 +54,34 @@ public class TelegramDeliveryService {
             );
 
             if (response.statusCode() != 200) {
-                log.error("Failed to send Telegram message: userId={}, operationId={}, chatId={}, statusCode={}",
-                        userId, operationId, chatId, response.statusCode());
-                throw new RuntimeException("Failed to send Telegram message");
+                String message = resolveTelegramErrorMessage(response.statusCode(), response.body());
+
+                log.error(
+                        "Failed to send Telegram message: userId={}, operationId={}, chatId={}, statusCode={}, responseBody={}",
+                        userId,
+                        operationId,
+                        normalizedChatId,
+                        response.statusCode(),
+                        response.body()
+                );
+
+                throw new RuntimeException(message);
             }
 
             log.info("Telegram OTP sent: userId={}, operationId={}, chatId={}",
                     userId, operationId, normalizedChatId);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.error("Failed to send Telegram message: userId={}, operationId={}, chatId={}",
-                    userId, operationId, chatId, e);
-            throw new RuntimeException("Failed to send Telegram message", e);
+
+            log.error("Telegram request was interrupted: userId={}, operationId={}, chatId={}",
+                    userId, operationId, normalizedChatId, e);
+
+            throw new RuntimeException("Telegram request was interrupted");
         } catch (IOException e) {
-            log.error("Failed to send Telegram message: userId={}, operationId={}, chatId={}",
-                    userId, operationId, chatId, e);
-            throw new RuntimeException("Failed to send Telegram message", e);
+            log.error("Telegram API is unavailable: userId={}, operationId={}, chatId={}",
+                    userId, operationId, normalizedChatId, e);
+
+            throw new RuntimeException("Telegram API is unavailable. Try again later.");
         }
     }
 
@@ -88,5 +101,27 @@ public class TelegramDeliveryService {
                 + "/bot" + botToken
                 + "/sendMessage?chat_id=" + chatId
                 + "&text=" + encodedMessage;
+    }
+
+    private String resolveTelegramErrorMessage(int statusCode, String responseBody) {
+        String body = responseBody == null ? "" : responseBody.toLowerCase(Locale.ROOT);
+
+        if (statusCode == 400 && body.contains("chat not found")) {
+            return "Telegram chat was not found. Complete Telegram binding again.";
+        }
+
+        if (statusCode == 403 && body.contains("bot was blocked by the user")) {
+            return "Telegram bot is blocked by the user. Unblock the bot and try again.";
+        }
+
+        if (statusCode == 401) {
+            return "Telegram bot configuration is invalid.";
+        }
+
+        if (statusCode >= 500) {
+            return "Telegram API is unavailable. Try again later.";
+        }
+
+        return "Failed to send Telegram message";
     }
 }

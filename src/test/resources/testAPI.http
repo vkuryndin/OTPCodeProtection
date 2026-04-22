@@ -1,7 +1,7 @@
 ### Base variables
 @host = http://localhost:8080
-@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc4Nzc1MCwiZXhwIjoxNzc2NzkxMzUwfQ.RYEl5qVgmjixZN7UwW3lI8CkqXRg8C3JxgzLmpY6Ofa2jfyDJ8r-udICfopZtoec
-@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxMCIsImxvZ2luIjoidXNlcl80Iiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NzY4ODM0NDcsImV4cCI6MTc3Njg4NzA0N30.fW8ewGYbmr_fpt5cVEenh0mm7urjTuIxogR9lQpxH4SenrbWhWoVacLgQjoR67Ro
+###@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc4Nzc1MCwiZXhwIjoxNzc2NzkxMzUwfQ.RYEl5qVgmjixZN7UwW3lI8CkqXRg8C3JxgzLmpY6Ofa2jfyDJ8r-udICfopZtoec
+###@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxMSIsImxvZ2luIjoidXNlcl8yIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NzY4ODQzNjIsImV4cCI6MTc3Njg4Nzk2Mn0.cVY1pxQ0y4TF0dwqAHd3S3TpSjukdTtBwyVBdywk8TMSuyDxL9VVdU6XvrjVDWDv
 @userId = 5
 @otpFile = otp-codes.txt
 @otpCode = 599987
@@ -18,16 +18,11 @@ Content-Type: application/json
   "login": "admin",
   "password": "12345678"
 }
+> {%
+    client.global.set("adminToken", response.body.token);
+    client.log("adminToken = " + client.global.get("adminToken"));
+%}
 
-
-### Login as user - valid
-POST {{host}}/auth/login
-Content-Type: application/json
-
-{
-  "login": "user_2",
-  "password": "12345678"
-}
 
 ### Login as user - valid
 POST {{host}}/auth/login
@@ -37,14 +32,39 @@ Content-Type: application/json
   "login": "user_4",
   "password": "12345678"
 }
+> {%
+    client.global.set("userToken", response.body.token);
+    client.log("userToken = " + client.global.get("userToken"));
+%}
+
+
 ### Login as user - valid
 POST {{host}}/auth/login
 Content-Type: application/json
 
 {
-  "login": "user_3",
+  "login": "user_5",
   "password": "12345678"
 }
+> {%
+    client.global.set("userToken", response.body.token);
+    client.log("userToken = " + client.global.get("userToken"));
+%}
+
+
+### Login as user - valid
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "user_5",
+  "password": "12345678"
+}
+
+> {%
+    client.global.set("userToken", response.body.token);
+    client.log("userToken = " + client.global.get("userToken"));
+%}
 
 ### =====================================
 ### 1. HEALTH

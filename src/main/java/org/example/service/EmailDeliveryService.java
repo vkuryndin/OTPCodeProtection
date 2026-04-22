@@ -56,9 +56,9 @@ public class EmailDeliveryService {
             log.info("OTP email sent: userId={}, operationId={}, to={}",
                     userId, operationId, normalizedEmail);
         } catch (Exception e) {
-            log.error("Failed to send OTP email: userId={}, operationId={}, to={}",
-                    userId, operationId, toEmail, e);
-            throw new RuntimeException("Failed to send email", e);
+            log.error("Email service is unavailable: userId={}, operationId={}, to={}",
+                    userId, operationId, normalizedEmail, e);
+            throw new RuntimeException("Email service is unavailable. Try again later.");
         }
     }
 
@@ -78,8 +78,9 @@ public class EmailDeliveryService {
 
             log.info("Telegram bind email sent: to={}, expiresAt={}", normalizedEmail, expiresAt);
         } catch (Exception e) {
-            log.error("Failed to send telegram bind email: to={}", toEmail, e);
-            throw new RuntimeException("Failed to send email", e);
+            log.error("Email service is unavailable while sending Telegram bind email: to={}",
+                    normalizedEmail, e);
+            throw new RuntimeException("Email service is unavailable. Try again later.");
         }
     }
 

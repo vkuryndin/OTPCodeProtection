@@ -85,12 +85,12 @@ public class SmsDeliveryService {
                     userId, operationId, normalizedPhone);
         } catch (java.io.IOException e) {
             log.warn("SMPP simulator is not available: userId={}, operationId={}, phone={}, host={}, port={}",
-                    userId, operationId, phone, host, port);
-            throw new RuntimeException("SMPP simulator is not available. Start the SMPP server and try again.", e);
+                    userId, operationId, normalizedPhone, host, port, e);
+            throw new RuntimeException("SMPP simulator is not available. Start the SMPP server and try again.");
         } catch (Exception e) {
-            log.error("Failed to send OTP SMS: userId={}, operationId={}, phone={}, error={}",
-                    userId, operationId, phone, e.getMessage());
-            throw new RuntimeException("Failed to send SMS", e);
+            log.error("SMS service is unavailable: userId={}, operationId={}, phone={}",
+                    userId, operationId, normalizedPhone, e);
+            throw new RuntimeException("SMS service is unavailable. Try again later.");
         } finally {
             try {
                 session.unbindAndClose();
