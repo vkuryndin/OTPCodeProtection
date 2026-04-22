@@ -5,9 +5,8 @@ import org.example.dto.GenerateOtpRequest;
 import org.example.dto.OtpGenerationResponse;
 import org.example.dto.OtpValidationResponse;
 import org.example.dto.ValidateOtpRequest;
-import org.example.security.AuthUtil;
+import org.example.security.RequestAuthService;
 import org.example.service.OtpService;
-import org.example.service.TokenService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,19 +16,17 @@ import org.springframework.web.bind.annotation.*;
 public class OtpController {
 
     private final OtpService otpService;
-    private final TokenService tokenService;
-    private final AuthUtil authUtil;
+    private final RequestAuthService requestAuthService;
 
-    public OtpController(OtpService otpService, TokenService tokenService, AuthUtil authUtil) {
+    public OtpController(OtpService otpService, RequestAuthService requestAuthService) {
         this.otpService = otpService;
-        this.tokenService = tokenService;
-        this.authUtil = authUtil;
+        this.requestAuthService = requestAuthService;
     }
 
     @PostMapping("/generate")
     public ResponseEntity<OtpGenerationResponse> generateOtp(@RequestBody GenerateOtpRequest request,
                                                              HttpServletRequest httpRequest) {
-        Long userId = extractUserId(httpRequest);
+        Long userId = requestAuthService.extractUserId(httpRequest);
         OtpGenerationResponse response = otpService.generateOtp(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -37,13 +34,8 @@ public class OtpController {
     @PostMapping("/validate")
     public ResponseEntity<OtpValidationResponse> validateOtp(@RequestBody ValidateOtpRequest request,
                                                              HttpServletRequest httpRequest) {
-        Long userId = extractUserId(httpRequest);
+        Long userId = requestAuthService.extractUserId(httpRequest);
         OtpValidationResponse response = otpService.validateOtp(userId, request);
         return ResponseEntity.ok(response);
-    }
-
-    private Long extractUserId(HttpServletRequest request) {
-        String token = authUtil.extractToken(request);
-        return tokenService.extractUserId(token);
     }
 }

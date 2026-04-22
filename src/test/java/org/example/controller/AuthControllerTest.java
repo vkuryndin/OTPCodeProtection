@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.dto.LoginRequest;
 import org.example.model.Role;
 import org.example.model.User;
-import org.example.security.AuthUtil;
+import org.example.security.RequestAuthService;
 import org.example.service.AuthService;
 import org.example.service.TokenService;
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
 @Import(GlobalExceptionHandler.class)
@@ -37,7 +38,8 @@ class AuthControllerTest {
     private TokenService tokenService;
 
     @MockBean
-    private AuthUtil authUtil;
+    private RequestAuthService requestAuthService;
+
     @Test
     void login_shouldReturnToken_whenCredentialsAreValid() throws Exception {
         LoginRequest request = new LoginRequest();

@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -56,6 +57,15 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleUnreadableMessage(HttpMessageNotReadableException e,
+                                                                       HttpServletRequest request) {
+        String message = resolveUnreadableMessage(e);
+
+        log.warn("HTTP 400: {} {} -> {}", request.getMethod(), request.getRequestURI(), message);
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, message);
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntime(RuntimeException e,
                                                              HttpServletRequest request) {
@@ -73,6 +83,22 @@ public class GlobalExceptionHandler {
     private boolean isSmppUnavailable(String message) {
         return SMPP_UNAVAILABLE_MESSAGE.equals(message)
                 || (message != null && message.startsWith("Cannot connect to SMPP simulator"));
+    }
+
+    private String resolveUnreadableMessage(HttpMessageNotReadableException e) {
+        String message = e.getMessage();
+
+        if (message == null || message.isBlank()) {
+            return "Request body is invalid";
+        }
+
+        String lower = message.toLowerCase();
+
+        if (lower.contains("required request body is missing")) {
+            return "Request body is required";
+        }
+
+        return "Request body is invalid";
     }
 
     private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String message) {

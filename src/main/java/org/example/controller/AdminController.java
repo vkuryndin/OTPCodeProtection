@@ -11,8 +11,7 @@ import org.example.model.Role;
 import org.example.model.User;
 import org.example.repository.OtpConfigRepository;
 import org.example.repository.UserRepository;
-import org.example.security.AuthUtil;
-import org.example.service.TokenService;
+import org.example.security.RequestAuthService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -31,23 +30,20 @@ public class AdminController {
     private static final Logger log = LoggerFactory.getLogger(AdminController.class);
 
     private final UserRepository userRepository;
-    private final AuthUtil authUtil;
     private final OtpConfigRepository otpConfigRepository;
-    private final TokenService tokenService;
+    private final RequestAuthService requestAuthService;
 
     public AdminController(UserRepository userRepository,
-                           AuthUtil authUtil,
                            OtpConfigRepository otpConfigRepository,
-                           TokenService tokenService) {
+                           RequestAuthService requestAuthService) {
         this.userRepository = userRepository;
-        this.authUtil = authUtil;
         this.otpConfigRepository = otpConfigRepository;
-        this.tokenService = tokenService;
+        this.requestAuthService = requestAuthService;
     }
 
     @GetMapping("/users")
     public ResponseEntity<List<UserResponse>> getUsers(HttpServletRequest request) {
-        Long adminId = requireAdminAndGetUserId(request);
+        Long adminId = requestAuthService.requireAdminUserId(request);
 
         List<UserResponse> users = userRepository.findAllNonAdmins()
                 .stream()
@@ -62,7 +58,7 @@ public class AdminController {
     @DeleteMapping("/users/{id}")
     public ResponseEntity<DeleteUserResponse> deleteUser(@PathVariable Long id,
                                                          HttpServletRequest request) {
-        Long adminId = requireAdminAndGetUserId(request);
+        Long adminId = requestAuthService.requireAdminUserId(request);
 
         User user = requireExistingUserForDelete(adminId, id);
         ensureTargetUserIsNotAdmin(adminId, id, user);
@@ -86,7 +82,7 @@ public class AdminController {
 
     @GetMapping("/otp-config")
     public ResponseEntity<?> getOtpConfig(HttpServletRequest request) {
-        Long adminId = requireAdminAndGetUserId(request);
+        Long adminId = requestAuthService.requireAdminUserId(request);
 
         OtpConfig config = otpConfigRepository.getConfig();
         if (config == null) {
@@ -103,7 +99,7 @@ public class AdminController {
     @PutMapping("/otp-config")
     public ResponseEntity<UpdateOtpConfigResponse> updateOtpConfig(@RequestBody UpdateOtpConfigRequest request,
                                                                    HttpServletRequest httpRequest) {
-        Long adminId = requireAdminAndGetUserId(httpRequest);
+        Long adminId = requestAuthService.requireAdminUserId(httpRequest);
 
         validateUpdateOtpConfigRequest(request, adminId);
 
@@ -127,17 +123,6 @@ public class AdminController {
         );
 
         return ResponseEntity.ok(response);
-    }
-
-    private Long requireAdminAndGetUserId(HttpServletRequest request) {
-        String token = authUtil.extractToken(request);
-        String role = tokenService.extractRole(token);
-
-        if (!Role.ADMIN.name().equals(role)) {
-            throw new SecurityException("Access denied");
-        }
-
-        return tokenService.extractUserId(token);
     }
 
     private User requireExistingUserForDelete(Long adminId, Long targetUserId) {

@@ -7,7 +7,7 @@ import org.example.dto.LogoutResponse;
 import org.example.dto.RegisterRequest;
 import org.example.dto.RegisterResponse;
 import org.example.model.User;
-import org.example.security.AuthUtil;
+import org.example.security.RequestAuthService;
 import org.example.service.AuthService;
 import org.example.service.TokenService;
 import org.slf4j.Logger;
@@ -24,12 +24,14 @@ public class AuthController {
 
     private final AuthService authService;
     private final TokenService tokenService;
-    private final AuthUtil authUtil;
+    private final RequestAuthService requestAuthService;
 
-    public AuthController(AuthService authService, TokenService tokenService, AuthUtil authUtil) {
+    public AuthController(AuthService authService,
+                          TokenService tokenService,
+                          RequestAuthService requestAuthService) {
         this.authService = authService;
         this.tokenService = tokenService;
-        this.authUtil = authUtil;
+        this.requestAuthService = requestAuthService;
     }
 
     @PostMapping("/register")
@@ -62,11 +64,10 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<LogoutResponse> logout(HttpServletRequest request) {
-        String token = authUtil.extractToken(request);
-        Long userId = tokenService.extractUserId(token);
+        RequestAuthService.RequestUserContext context = requestAuthService.read(request);
 
-        tokenService.revokeToken(token);
-        log.info("Logout successful: userId={}", userId);
+        tokenService.revokeToken(context.token());
+        log.info("Logout successful: userId={}", context.userId());
 
         LogoutResponse response = new LogoutResponse("Logout successful");
         return ResponseEntity.ok(response);
