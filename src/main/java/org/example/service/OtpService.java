@@ -37,6 +37,7 @@ public class OtpService {
     private final UserRepository userRepository;
     private final TelegramDeliveryService telegramDeliveryService;
     private final SmsDeliveryService smsDeliveryService;
+    private final GenerateOtpRateLimitService generateOtpRateLimitService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     private final Map<String, ValidationAttemptState> failedValidationAttempts = new ConcurrentHashMap<>();
@@ -47,7 +48,8 @@ public class OtpService {
                       EmailDeliveryService emailDeliveryService,
                       TelegramDeliveryService telegramDeliveryService,
                       SmsDeliveryService smsDeliveryService,
-                      UserRepository userRepository) {
+                      UserRepository userRepository,
+                      GenerateOtpRateLimitService generateOtpRateLimitService) {
         this.otpConfigRepository = otpConfigRepository;
         this.otpCodeRepository = otpCodeRepository;
         this.fileDeliveryService = fileDeliveryService;
@@ -55,6 +57,7 @@ public class OtpService {
         this.telegramDeliveryService = telegramDeliveryService;
         this.smsDeliveryService = smsDeliveryService;
         this.userRepository = userRepository;
+        this.generateOtpRateLimitService = generateOtpRateLimitService;
     }
 
     public OtpGenerationResponse generateOtp(Long userId, GenerateOtpRequest request) {
@@ -72,6 +75,8 @@ public class OtpService {
         LocalDateTime expiresAt = now.plusSeconds(config.getTtlSeconds());
         String code = generateNumericCode(config.getCodeLength());
         String deliveryTarget = resolveDeliveryTarget(userId, user, request);
+
+        generateOtpRateLimitService.validateAndRegisterAttempt(userId);
 
         OtpCode otpCode = buildOtpCode(userId, operationId, channel, deliveryTarget, code, now, expiresAt);
         Long otpId = otpCodeRepository.createOtpCode(otpCode);

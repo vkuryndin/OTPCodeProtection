@@ -3,6 +3,7 @@ package org.example.service;
 import org.example.dto.GenerateOtpRequest;
 import org.example.dto.ValidateOtpRequest;
 import org.example.exception.NotFoundException;
+import org.example.exception.RateLimitExceededException;
 import org.example.model.DeliveryChannel;
 import org.example.model.OtpCode;
 import org.example.model.OtpConfig;
@@ -49,6 +50,9 @@ class OtpServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private GenerateOtpRateLimitService generateOtpRateLimitService;
 
     @InjectMocks
     private OtpService otpService;
@@ -103,6 +107,7 @@ class OtpServiceTest {
         assertNotNull(savedOtp.getExpiresAt());
         assertNotNull(savedOtp.getSentAt());
 
+        verify(generateOtpRateLimitService).validateAndRegisterAttempt(userId);
         verify(fileDeliveryService).saveOtpToFile(
                 eq("otp-codes.txt"),
                 eq(userId),
@@ -115,8 +120,49 @@ class OtpServiceTest {
     }
 
     @Test
-    void generateOtp_shouldSendEmail_whenChannelIsEmail() {
+    void generateOtp_shouldThrowRateLimitExceededException_whenGenerationLimitIsExceeded() {
         Long userId = 11L;
+
+        User user = new User();
+        user.setId(userId);
+        user.setLogin("user_rate_limit");
+        user.setRole(Role.USER);
+        user.setEmail("user_rate_limit@test.com");
+        user.setPhone("+37400112233");
+        user.setTelegramChatId("123456789");
+
+        OtpConfig config = new OtpConfig();
+        config.setId(1);
+        config.setCodeLength(6);
+        config.setTtlSeconds(300);
+
+        GenerateOtpRequest request = new GenerateOtpRequest();
+        request.setOperationId("payment-file-rate-limit-001");
+        request.setDeliveryChannel(DeliveryChannel.FILE);
+        request.setDeliveryTarget("otp-codes.txt");
+
+        when(userRepository.findById(userId)).thenReturn(user);
+        when(otpConfigRepository.getConfig()).thenReturn(config);
+
+        doThrow(new RateLimitExceededException("Too many OTP generation requests. Try again later."))
+                .when(generateOtpRateLimitService)
+                .validateAndRegisterAttempt(userId);
+
+        RateLimitExceededException exception = assertThrows(
+                RateLimitExceededException.class,
+                () -> otpService.generateOtp(userId, request)
+        );
+
+        assertEquals("Too many OTP generation requests. Try again later.", exception.getMessage());
+
+        verify(generateOtpRateLimitService).validateAndRegisterAttempt(userId);
+        verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
+        verifyNoInteractions(fileDeliveryService, emailDeliveryService, telegramDeliveryService, smsDeliveryService);
+    }
+
+    @Test
+    void generateOtp_shouldSendEmail_whenChannelIsEmail() {
+        Long userId = 12L;
 
         User user = new User();
         user.setId(userId);
@@ -143,6 +189,7 @@ class OtpServiceTest {
         assertEquals(DeliveryChannel.EMAIL, readProperty(response, "deliveryChannel"));
         assertEquals("user_email@test.com", readProperty(response, "deliveryTarget"));
 
+        verify(generateOtpRateLimitService).validateAndRegisterAttempt(userId);
         verify(emailDeliveryService).sendOtpEmail(
                 eq("user_email@test.com"),
                 eq(userId),
@@ -156,7 +203,7 @@ class OtpServiceTest {
 
     @Test
     void generateOtp_shouldThrowIllegalArgumentException_whenUserEmailIsMissing() {
-        Long userId = 12L;
+        Long userId = 13L;
 
         User user = new User();
         user.setId(userId);
@@ -183,13 +230,14 @@ class OtpServiceTest {
 
         assertEquals("User email is not set", exception.getMessage());
 
+        verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
         verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
         verifyNoInteractions(emailDeliveryService);
     }
 
     @Test
     void generateOtp_shouldThrowIllegalArgumentException_whenUserPhoneIsMissing() {
-        Long userId = 13L;
+        Long userId = 14L;
 
         User user = new User();
         user.setId(userId);
@@ -217,13 +265,14 @@ class OtpServiceTest {
 
         assertEquals("User phone is not set", exception.getMessage());
 
+        verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
         verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
         verifyNoInteractions(smsDeliveryService);
     }
 
     @Test
     void generateOtp_shouldThrowIllegalArgumentException_whenTelegramChatIdIsMissing() {
-        Long userId = 14L;
+        Long userId = 15L;
 
         User user = new User();
         user.setId(userId);
@@ -252,13 +301,14 @@ class OtpServiceTest {
 
         assertEquals("User telegram chat id is not set", exception.getMessage());
 
+        verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
         verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
         verifyNoInteractions(telegramDeliveryService);
     }
 
     @Test
     void generateOtp_shouldThrowIllegalArgumentException_whenFileTargetIsMissing() {
-        Long userId = 15L;
+        Long userId = 16L;
 
         User user = new User();
         user.setId(userId);
@@ -288,13 +338,14 @@ class OtpServiceTest {
 
         assertEquals("Delivery target is required", exception.getMessage());
 
+        verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
         verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
         verifyNoInteractions(fileDeliveryService);
     }
 
     @Test
     void generateOtp_shouldThrowNotFoundException_whenOtpConfigIsMissing() {
-        Long userId = 16L;
+        Long userId = 17L;
 
         User user = new User();
         user.setId(userId);
@@ -316,6 +367,7 @@ class OtpServiceTest {
 
         assertEquals("OTP config not found", exception.getMessage());
 
+        verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
         verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
     }
 
@@ -486,6 +538,7 @@ class OtpServiceTest {
 
         assertEquals("File delivery failed", exception.getMessage());
 
+        verify(generateOtpRateLimitService).validateAndRegisterAttempt(userId);
         verify(otpCodeRepository).createOtpCode(any(OtpCode.class));
         verify(fileDeliveryService).saveOtpToFile(
                 eq("otp-fail.txt"),

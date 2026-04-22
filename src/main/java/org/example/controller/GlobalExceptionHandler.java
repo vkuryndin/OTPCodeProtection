@@ -2,6 +2,7 @@ package org.example.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.example.exception.NotFoundException;
+import org.example.exception.RateLimitExceededException;
 import org.example.exception.UnauthorizedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,9 @@ public class GlobalExceptionHandler {
 
     private static final String EMAIL_UNAVAILABLE_MESSAGE =
             "Email service is unavailable. Try again later.";
+
+    private static final String SMS_UNAVAILABLE_MESSAGE =
+            "SMS service is unavailable. Try again later.";
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<Map<String, Object>> handleUnauthorized(UnauthorizedException e,
@@ -63,6 +67,13 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleRateLimitExceeded(RateLimitExceededException e,
+                                                                       HttpServletRequest request) {
+        log.warn("HTTP 429: {} {} -> {}", request.getMethod(), request.getRequestURI(), e.getMessage());
+        return buildErrorResponse(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> handleUnreadableMessage(HttpMessageNotReadableException e,
                                                                        HttpServletRequest request) {
@@ -89,7 +100,8 @@ public class GlobalExceptionHandler {
     private boolean isExternalServiceUnavailable(String message) {
         return isSmppUnavailable(message)
                 || isTelegramUnavailable(message)
-                || isEmailUnavailable(message);
+                || isEmailUnavailable(message)
+                || isSmsUnavailable(message);
     }
 
     private boolean isSmppUnavailable(String message) {
@@ -103,6 +115,10 @@ public class GlobalExceptionHandler {
 
     private boolean isEmailUnavailable(String message) {
         return EMAIL_UNAVAILABLE_MESSAGE.equals(message);
+    }
+
+    private boolean isSmsUnavailable(String message) {
+        return SMS_UNAVAILABLE_MESSAGE.equals(message);
     }
 
     private String resolveUnreadableMessage(HttpMessageNotReadableException e) {
