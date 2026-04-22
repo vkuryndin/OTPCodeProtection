@@ -62,14 +62,7 @@ public class UserRepository {
             SET telegram_bind_token = ?, telegram_bind_expires_at = ?
             WHERE id = ?
             """;
-
-    private static final String FIND_BY_TELEGRAM_BIND_TOKEN_SQL = """
-            SELECT id, login, password_hash, role, email, phone, telegram_chat_id,
-                   telegram_bind_token, telegram_bind_expires_at, created_at
-            FROM users
-            WHERE telegram_bind_token = ?
-            """;
-
+    
     private static final String BIND_TELEGRAM_CHAT_ID_SQL = """
             UPDATE users
             SET telegram_chat_id = ?, telegram_bind_token = NULL, telegram_bind_expires_at = NULL

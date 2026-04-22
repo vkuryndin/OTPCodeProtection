@@ -17,14 +17,12 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordHasher passwordHasher;
-    private final TokenService tokenService;
 
     public AuthService(UserRepository userRepository,
                        PasswordHasher passwordHasher,
                        TokenService tokenService) {
         this.userRepository = userRepository;
         this.passwordHasher = passwordHasher;
-        this.tokenService = tokenService;
     }
 
     public Long register(RegisterRequest request) {
