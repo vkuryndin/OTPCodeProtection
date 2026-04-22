@@ -19,11 +19,16 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class OtpService {
 
     private static final Logger log = LoggerFactory.getLogger(OtpService.class);
+
+    private static final int MAX_INVALID_VALIDATION_ATTEMPTS = 5;
+    private static final long VALIDATION_BLOCK_MINUTES = 5;
 
     private final OtpConfigRepository otpConfigRepository;
     private final OtpCodeRepository otpCodeRepository;
@@ -33,6 +38,8 @@ public class OtpService {
     private final TelegramDeliveryService telegramDeliveryService;
     private final SmsDeliveryService smsDeliveryService;
     private final SecureRandom secureRandom = new SecureRandom();
+
+    private final Map<String, ValidationAttemptState> failedValidationAttempts = new ConcurrentHashMap<>();
 
     public OtpService(OtpConfigRepository otpConfigRepository,
                       OtpCodeRepository otpCodeRepository,
@@ -97,20 +104,19 @@ public class OtpService {
         String code = request.getCode().trim();
 
         otpCodeRepository.expireActiveCodes();
+        ensureValidationNotBlocked(userId, operationId);
 
-        OtpCode otpCode = otpCodeRepository.findActiveCode(userId, operationId, code);
+        OtpCode otpCode = otpCodeRepository.consumeActiveCode(userId, operationId, code);
+
         if (otpCode == null) {
+            registerFailedValidationAttempt(userId, operationId);
+
             log.warn("OTP validation failed: invalid or expired code, userId={}, operationId={}",
-                    userId, request.getOperationId());
+                    userId, operationId);
             throw new IllegalArgumentException("Invalid or expired OTP code");
         }
 
-        boolean updated = otpCodeRepository.markAsUsed(otpCode.getId());
-        if (!updated) {
-            log.warn("OTP validation failed: OTP already used or expired during update, otpId={}, userId={}",
-                    otpCode.getId(), userId);
-            throw new IllegalArgumentException("Invalid or expired OTP code");
-        }
+        clearFailedValidationAttempts(userId, operationId);
 
         log.info("OTP validated successfully: otpId={}, userId={}, operationId={}",
                 otpCode.getId(), userId, otpCode.getOperationId());
@@ -253,7 +259,6 @@ public class OtpService {
                     code,
                     expiresAt
             );
-
             case EMAIL -> emailDeliveryService.sendOtpEmail(
                     otpCode.getDeliveryTarget(),
                     userId,
@@ -261,7 +266,6 @@ public class OtpService {
                     code,
                     expiresAt
             );
-
             case TELEGRAM -> telegramDeliveryService.sendOtpMessage(
                     otpCode.getDeliveryTarget(),
                     userId,
@@ -269,7 +273,6 @@ public class OtpService {
                     code,
                     expiresAt
             );
-
             case SMS -> smsDeliveryService.sendOtpSms(
                     otpCode.getDeliveryTarget(),
                     userId,
@@ -277,12 +280,6 @@ public class OtpService {
                     code,
                     expiresAt
             );
-
-            default -> {
-                log.warn("OTP delivery failed: unsupported delivery channel, otpId={}, userId={}, operationId={}, channel={}",
-                        otpId, userId, otpCode.getOperationId(), otpCode.getDeliveryChannel());
-                throw new IllegalArgumentException("Delivery channel is not supported yet");
-            }
         }
     }
 
@@ -296,7 +293,6 @@ public class OtpService {
                 }
                 yield request.getDeliveryTarget().trim();
             }
-
             case EMAIL -> {
                 if (user.getEmail() == null || user.getEmail().isBlank()) {
                     log.warn("OTP generation failed: user email is not set, userId={}, login={}",
@@ -305,7 +301,6 @@ public class OtpService {
                 }
                 yield user.getEmail().trim();
             }
-
             case TELEGRAM -> {
                 if (user.getTelegramChatId() == null || user.getTelegramChatId().isBlank()) {
                     log.warn("OTP generation failed: telegram chat id is not set, userId={}, login={}",
@@ -314,7 +309,6 @@ public class OtpService {
                 }
                 yield user.getTelegramChatId().trim();
             }
-
             case SMS -> {
                 if (user.getPhone() == null || user.getPhone().isBlank()) {
                     log.warn("OTP generation failed: user phone is not set, userId={}, login={}",
@@ -324,5 +318,59 @@ public class OtpService {
                 yield user.getPhone().trim();
             }
         };
+    }
+
+    private synchronized void ensureValidationNotBlocked(Long userId, String operationId) {
+        String key = validationAttemptKey(userId, operationId);
+        ValidationAttemptState state = failedValidationAttempts.get(key);
+
+        if (state == null) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (state.blockedUntil != null && state.blockedUntil.isAfter(now)) {
+            log.warn("OTP validation blocked: userId={}, operationId={}, blockedUntil={}",
+                    userId, operationId, state.blockedUntil);
+            throw new IllegalArgumentException("Too many invalid OTP attempts. Try again later.");
+        }
+
+        if (state.blockedUntil != null && !state.blockedUntil.isAfter(now)) {
+            failedValidationAttempts.remove(key);
+        }
+    }
+
+    private synchronized void registerFailedValidationAttempt(Long userId, String operationId) {
+        String key = validationAttemptKey(userId, operationId);
+        ValidationAttemptState state = failedValidationAttempts.computeIfAbsent(key, ignored -> new ValidationAttemptState());
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (state.blockedUntil != null && state.blockedUntil.isAfter(now)) {
+            return;
+        }
+
+        state.failedAttempts++;
+
+        if (state.failedAttempts >= MAX_INVALID_VALIDATION_ATTEMPTS) {
+            state.blockedUntil = now.plusMinutes(VALIDATION_BLOCK_MINUTES);
+
+            log.warn("OTP validation temporarily blocked: userId={}, operationId={}, failedAttempts={}, blockedUntil={}",
+                    userId, operationId, state.failedAttempts, state.blockedUntil);
+        }
+    }
+
+    private synchronized void clearFailedValidationAttempts(Long userId, String operationId) {
+        failedValidationAttempts.remove(validationAttemptKey(userId, operationId));
+    }
+
+    private String validationAttemptKey(Long userId, String operationId) {
+        return userId + ":" + operationId;
+    }
+
+    private static final class ValidationAttemptState {
+        private int failedAttempts;
+        private LocalDateTime blockedUntil;
     }
 }

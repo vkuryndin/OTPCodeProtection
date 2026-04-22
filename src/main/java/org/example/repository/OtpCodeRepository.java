@@ -30,24 +30,34 @@ public class OtpCodeRepository {
             RETURNING id
             """;
 
-    private static final String FIND_ACTIVE_CODE_SQL = """
-            SELECT id, user_id, operation_id, code, status, delivery_channel, delivery_target,
-                   created_at, expires_at, sent_at, used_at
-            FROM otp_codes
-            WHERE user_id = ?
-              AND operation_id = ?
-              AND code = ?
-              AND status = 'ACTIVE'
-            ORDER BY id DESC
-            LIMIT 1
-            """;
-
-    private static final String MARK_AS_USED_SQL = """
-            UPDATE otp_codes
+    private static final String CONSUME_ACTIVE_CODE_SQL = """
+            WITH candidate AS (
+                SELECT id
+                FROM otp_codes
+                WHERE user_id = ?
+                  AND operation_id = ?
+                  AND code = ?
+                  AND status = 'ACTIVE'
+                  AND expires_at >= CURRENT_TIMESTAMP
+                ORDER BY id DESC
+                LIMIT 1
+            )
+            UPDATE otp_codes o
             SET status = 'USED',
                 used_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-              AND status = 'ACTIVE'
+            FROM candidate
+            WHERE o.id = candidate.id
+            RETURNING o.id,
+                      o.user_id,
+                      o.operation_id,
+                      o.code,
+                      o.status,
+                      o.delivery_channel,
+                      o.delivery_target,
+                      o.created_at,
+                      o.expires_at,
+                      o.sent_at,
+                      o.used_at
             """;
 
     private static final String EXPIRE_ACTIVE_CODES_SQL = """
@@ -92,9 +102,9 @@ public class OtpCodeRepository {
         }
     }
 
-    public OtpCode findActiveCode(Long userId, String operationId, String code) {
+    public OtpCode consumeActiveCode(Long userId, String operationId, String code) {
         try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(FIND_ACTIVE_CODE_SQL)) {
+             PreparedStatement statement = connection.prepareStatement(CONSUME_ACTIVE_CODE_SQL)) {
 
             statement.setLong(1, userId);
             statement.setString(2, operationId);
@@ -107,18 +117,7 @@ public class OtpCodeRepository {
                 return mapRow(rs);
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to find active OTP code", e);
-        }
-    }
-
-    public boolean markAsUsed(Long otpCodeId) {
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(MARK_AS_USED_SQL)) {
-
-            statement.setLong(1, otpCodeId);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to mark OTP code as used", e);
+            throw new RuntimeException("Failed to consume active OTP code", e);
         }
     }
 

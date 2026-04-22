@@ -332,11 +332,10 @@ class OtpServiceTest {
         otpCode.setUserId(userId);
         otpCode.setOperationId("payment-validate-001");
         otpCode.setCode("123456");
-        otpCode.setStatus(OtpStatus.ACTIVE);
+        otpCode.setStatus(OtpStatus.USED);
 
-        when(otpCodeRepository.findActiveCode(userId, "payment-validate-001", "123456"))
+        when(otpCodeRepository.consumeActiveCode(userId, "payment-validate-001", "123456"))
                 .thenReturn(otpCode);
-        when(otpCodeRepository.markAsUsed(200L)).thenReturn(true);
 
         Object response = otpService.validateOtp(userId, request);
 
@@ -346,8 +345,7 @@ class OtpServiceTest {
         assertEquals(OtpStatus.USED, readProperty(response, "status"));
 
         verify(otpCodeRepository).expireActiveCodes();
-        verify(otpCodeRepository).findActiveCode(userId, "payment-validate-001", "123456");
-        verify(otpCodeRepository).markAsUsed(200L);
+        verify(otpCodeRepository).consumeActiveCode(userId, "payment-validate-001", "123456");
     }
 
     @Test
@@ -358,7 +356,7 @@ class OtpServiceTest {
         request.setOperationId("payment-validate-002");
         request.setCode("000000");
 
-        when(otpCodeRepository.findActiveCode(userId, "payment-validate-002", "000000"))
+        when(otpCodeRepository.consumeActiveCode(userId, "payment-validate-002", "000000"))
                 .thenReturn(null);
 
         IllegalArgumentException exception = assertThrows(
@@ -369,40 +367,82 @@ class OtpServiceTest {
         assertEquals("Invalid or expired OTP code", exception.getMessage());
 
         verify(otpCodeRepository).expireActiveCodes();
-        verify(otpCodeRepository).findActiveCode(userId, "payment-validate-002", "000000");
-        verify(otpCodeRepository, never()).markAsUsed(anyLong());
+        verify(otpCodeRepository).consumeActiveCode(userId, "payment-validate-002", "000000");
     }
 
     @Test
-    void validateOtp_shouldThrowIllegalArgumentException_whenMarkAsUsedFails() {
+    void validateOtp_shouldThrowIllegalArgumentException_whenTooManyInvalidAttempts() {
         Long userId = 22L;
 
         ValidateOtpRequest request = new ValidateOtpRequest();
         request.setOperationId("payment-validate-003");
         request.setCode("654321");
 
-        OtpCode otpCode = new OtpCode();
-        otpCode.setId(300L);
-        otpCode.setUserId(userId);
-        otpCode.setOperationId("payment-validate-003");
-        otpCode.setCode("654321");
-        otpCode.setStatus(OtpStatus.ACTIVE);
+        when(otpCodeRepository.consumeActiveCode(userId, "payment-validate-003", "654321"))
+                .thenReturn(null);
 
-        when(otpCodeRepository.findActiveCode(userId, "payment-validate-003", "654321"))
-                .thenReturn(otpCode);
-        when(otpCodeRepository.markAsUsed(300L)).thenReturn(false);
+        for (int i = 0; i < 5; i++) {
+            IllegalArgumentException exception = assertThrows(
+                    IllegalArgumentException.class,
+                    () -> otpService.validateOtp(userId, request)
+            );
 
-        IllegalArgumentException exception = assertThrows(
+            assertEquals("Invalid or expired OTP code", exception.getMessage());
+        }
+
+        IllegalArgumentException blockedException = assertThrows(
                 IllegalArgumentException.class,
                 () -> otpService.validateOtp(userId, request)
         );
 
-        assertEquals("Invalid or expired OTP code", exception.getMessage());
+        assertEquals("Too many invalid OTP attempts. Try again later.", blockedException.getMessage());
 
-        verify(otpCodeRepository).expireActiveCodes();
-        verify(otpCodeRepository).findActiveCode(userId, "payment-validate-003", "654321");
-        verify(otpCodeRepository).markAsUsed(300L);
+        verify(otpCodeRepository, times(5)).consumeActiveCode(userId, "payment-validate-003", "654321");
     }
+
+    @Test
+    void validateOtp_shouldClearFailedAttempts_afterSuccessfulValidation() {
+        Long userId = 23L;
+
+        ValidateOtpRequest wrongRequest = new ValidateOtpRequest();
+        wrongRequest.setOperationId("payment-validate-004");
+        wrongRequest.setCode("000000");
+
+        ValidateOtpRequest correctRequest = new ValidateOtpRequest();
+        correctRequest.setOperationId("payment-validate-004");
+        correctRequest.setCode("123456");
+
+        OtpCode usedOtp = new OtpCode();
+        usedOtp.setId(400L);
+        usedOtp.setUserId(userId);
+        usedOtp.setOperationId("payment-validate-004");
+        usedOtp.setCode("123456");
+        usedOtp.setStatus(OtpStatus.USED);
+
+        when(otpCodeRepository.consumeActiveCode(userId, "payment-validate-004", "000000"))
+                .thenReturn(null);
+        when(otpCodeRepository.consumeActiveCode(userId, "payment-validate-004", "123456"))
+                .thenReturn(usedOtp);
+
+        IllegalArgumentException firstException = assertThrows(
+                IllegalArgumentException.class,
+                () -> otpService.validateOtp(userId, wrongRequest)
+        );
+        assertEquals("Invalid or expired OTP code", firstException.getMessage());
+
+        Object response = otpService.validateOtp(userId, correctRequest);
+        assertEquals("OTP validated successfully", readProperty(response, "message"));
+
+        IllegalArgumentException secondException = assertThrows(
+                IllegalArgumentException.class,
+                () -> otpService.validateOtp(userId, wrongRequest)
+        );
+        assertEquals("Invalid or expired OTP code", secondException.getMessage());
+
+        verify(otpCodeRepository, times(2)).consumeActiveCode(userId, "payment-validate-004", "000000");
+        verify(otpCodeRepository).consumeActiveCode(userId, "payment-validate-004", "123456");
+    }
+
     @Test
     void generateOtp_shouldDeleteCreatedOtp_whenDeliveryFails() {
         Long userId = 30L;
@@ -471,7 +511,8 @@ class OtpServiceTest {
                 return accessor.invoke(target);
             }
         } catch (Exception e) {
-            fail("Failed to read property '" + propertyName + "' from " + target.getClass().getSimpleName() + ": " + e.getMessage());
+            fail("Failed to read property '" + propertyName + "' from "
+                    + target.getClass().getSimpleName() + ": " + e.getMessage());
             return null;
         }
     }
