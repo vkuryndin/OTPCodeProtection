@@ -82,33 +82,43 @@ public class OtpCodeRepository {
             WHERE id = ?
             """;
 
+    private static final String GENERATE_LOCK_SQL = """
+            SELECT pg_advisory_xact_lock(?, ?)
+            """;
+
     public Long createOtpCode(OtpCode otpCode) {
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(CREATE_OTP_CODE_SQL)) {
-
-            statement.setLong(1, otpCode.getUserId());
-            statement.setString(2, otpCode.getOperationId());
-            statement.setString(3, otpCode.getCode());
-            statement.setString(4, otpCode.getStatus().name());
-            statement.setString(5, otpCode.getDeliveryChannel().name());
-            statement.setString(6, otpCode.getDeliveryTarget());
-            statement.setTimestamp(7, Timestamp.valueOf(otpCode.getExpiresAt()));
-
-            if (otpCode.getSentAt() == null) {
-                statement.setTimestamp(8, null);
-            } else {
-                statement.setTimestamp(8, Timestamp.valueOf(otpCode.getSentAt()));
-            }
-
-            try (ResultSet rs = statement.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getLong("id");
-                }
-            }
-
-            throw new RuntimeException("Failed to create OTP code: no id returned");
+        try (Connection connection = ConnectionFactory.getConnection()) {
+            return insertOtpCode(connection, otpCode);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create OTP code", e);
+        }
+    }
+
+    public Long createOtpCodeReplacingActive(OtpCode otpCode) {
+        try (Connection connection = ConnectionFactory.getConnection()) {
+            boolean originalAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+
+            try {
+                acquireGenerationLock(connection, otpCode.getUserId(), otpCode.getOperationId());
+                expireActiveCodesForUserOperation(connection, otpCode.getUserId(), otpCode.getOperationId());
+
+                Long otpId = insertOtpCode(connection, otpCode);
+                connection.commit();
+                return otpId;
+            } catch (SQLException | RuntimeException e) {
+                rollbackQuietly(connection);
+
+                if (e instanceof RuntimeException runtimeException) {
+                    throw runtimeException;
+                }
+
+                throw new RuntimeException("Failed to create OTP code atomically", e);
+            } finally {
+                restoreAutoCommit(connection, originalAutoCommit);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to create OTP code atomically", e);
         }
     }
 
@@ -142,12 +152,8 @@ public class OtpCodeRepository {
     }
 
     public int expireActiveCodesForUserOperation(Long userId, String operationId) {
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(EXPIRE_ACTIVE_CODES_FOR_USER_OPERATION_SQL)) {
-
-            statement.setLong(1, userId);
-            statement.setString(2, operationId);
-            return statement.executeUpdate();
+        try (Connection connection = ConnectionFactory.getConnection()) {
+            return expireActiveCodesForUserOperation(connection, userId, operationId);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to expire active OTP codes for user and operation", e);
         }
@@ -161,6 +167,64 @@ public class OtpCodeRepository {
             return statement.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to delete OTP code", e);
+        }
+    }
+
+    private Long insertOtpCode(Connection connection, OtpCode otpCode) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(CREATE_OTP_CODE_SQL)) {
+
+            statement.setLong(1, otpCode.getUserId());
+            statement.setString(2, otpCode.getOperationId());
+            statement.setString(3, otpCode.getCode());
+            statement.setString(4, otpCode.getStatus().name());
+            statement.setString(5, otpCode.getDeliveryChannel().name());
+            statement.setString(6, otpCode.getDeliveryTarget());
+            statement.setTimestamp(7, Timestamp.valueOf(otpCode.getExpiresAt()));
+
+            if (otpCode.getSentAt() == null) {
+                statement.setTimestamp(8, null);
+            } else {
+                statement.setTimestamp(8, Timestamp.valueOf(otpCode.getSentAt()));
+            }
+
+            try (ResultSet rs = statement.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong("id");
+                }
+            }
+
+            throw new RuntimeException("Failed to create OTP code: no id returned");
+        }
+    }
+
+    private int expireActiveCodesForUserOperation(Connection connection, Long userId, String operationId)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(EXPIRE_ACTIVE_CODES_FOR_USER_OPERATION_SQL)) {
+            statement.setLong(1, userId);
+            statement.setString(2, operationId);
+            return statement.executeUpdate();
+        }
+    }
+
+    private void acquireGenerationLock(Connection connection, Long userId, String operationId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(GENERATE_LOCK_SQL)) {
+            statement.setInt(1, Long.hashCode(userId));
+            statement.setInt(2, operationId.hashCode());
+            statement.executeQuery();
+        }
+    }
+
+    private void rollbackQuietly(Connection connection) {
+        try {
+            connection.rollback();
+        } catch (SQLException ignored) {
+        }
+    }
+
+    private void restoreAutoCommit(Connection connection, boolean originalAutoCommit) {
+        try {
+            connection.setAutoCommit(originalAutoCommit);
+        } catch (SQLException ignored) {
         }
     }
 

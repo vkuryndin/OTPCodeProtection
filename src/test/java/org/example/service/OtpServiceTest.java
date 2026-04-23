@@ -81,7 +81,7 @@ class OtpServiceTest {
 
         when(userRepository.findById(userId)).thenReturn(user);
         when(otpConfigRepository.getConfig()).thenReturn(config);
-        when(otpCodeRepository.createOtpCode(any(OtpCode.class))).thenReturn(100L);
+        when(otpCodeRepository.createOtpCodeReplacingActive(any(OtpCode.class))).thenReturn(100L);
 
         Object response = otpService.generateOtp(userId, request);
 
@@ -94,7 +94,7 @@ class OtpServiceTest {
         assertNotNull(readProperty(response, "expiresAt"));
 
         ArgumentCaptor<OtpCode> otpCaptor = ArgumentCaptor.forClass(OtpCode.class);
-        verify(otpCodeRepository).createOtpCode(otpCaptor.capture());
+        verify(otpCodeRepository).createOtpCodeReplacingActive(otpCaptor.capture());
 
         OtpCode savedOtp = otpCaptor.getValue();
         assertEquals(userId, savedOtp.getUserId());
@@ -156,7 +156,7 @@ class OtpServiceTest {
         assertEquals("Too many OTP generation requests. Try again later.", exception.getMessage());
 
         verify(generateOtpRateLimitService).validateAndRegisterAttempt(userId);
-        verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
+        verify(otpCodeRepository, never()).createOtpCodeReplacingActive(any(OtpCode.class));
         verifyNoInteractions(fileDeliveryService, emailDeliveryService, telegramDeliveryService, smsDeliveryService);
     }
 
@@ -181,7 +181,7 @@ class OtpServiceTest {
 
         when(userRepository.findById(userId)).thenReturn(user);
         when(otpConfigRepository.getConfig()).thenReturn(config);
-        when(otpCodeRepository.createOtpCode(any(OtpCode.class))).thenReturn(101L);
+        when(otpCodeRepository.createOtpCodeReplacingActive(any(OtpCode.class))).thenReturn(101L);
 
         Object response = otpService.generateOtp(userId, request);
 
@@ -231,7 +231,7 @@ class OtpServiceTest {
         assertEquals("User email is not set", exception.getMessage());
 
         verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
-        verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
+        verify(otpCodeRepository, never()).createOtpCodeReplacingActive(any(OtpCode.class));
         verifyNoInteractions(emailDeliveryService);
     }
 
@@ -266,7 +266,7 @@ class OtpServiceTest {
         assertEquals("User phone is not set", exception.getMessage());
 
         verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
-        verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
+        verify(otpCodeRepository, never()).createOtpCodeReplacingActive(any(OtpCode.class));
         verifyNoInteractions(smsDeliveryService);
     }
 
@@ -302,7 +302,7 @@ class OtpServiceTest {
         assertEquals("User telegram chat id is not set", exception.getMessage());
 
         verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
-        verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
+        verify(otpCodeRepository, never()).createOtpCodeReplacingActive(any(OtpCode.class));
         verifyNoInteractions(telegramDeliveryService);
     }
 
@@ -339,7 +339,7 @@ class OtpServiceTest {
         assertEquals("Delivery target is required", exception.getMessage());
 
         verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
-        verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
+        verify(otpCodeRepository, never()).createOtpCodeReplacingActive(any(OtpCode.class));
         verifyNoInteractions(fileDeliveryService);
     }
 
@@ -368,7 +368,7 @@ class OtpServiceTest {
         assertEquals("OTP config not found", exception.getMessage());
 
         verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
-        verify(otpCodeRepository, never()).createOtpCode(any(OtpCode.class));
+        verify(otpCodeRepository, never()).createOtpCodeReplacingActive(any(OtpCode.class));
     }
 
     @Test
@@ -519,7 +519,7 @@ class OtpServiceTest {
 
         when(userRepository.findById(userId)).thenReturn(user);
         when(otpConfigRepository.getConfig()).thenReturn(config);
-        when(otpCodeRepository.createOtpCode(any(OtpCode.class))).thenReturn(555L);
+        when(otpCodeRepository.createOtpCodeReplacingActive(any(OtpCode.class))).thenReturn(555L);
 
         doThrow(new RuntimeException("File delivery failed"))
                 .when(fileDeliveryService)
@@ -539,7 +539,7 @@ class OtpServiceTest {
         assertEquals("File delivery failed", exception.getMessage());
 
         verify(generateOtpRateLimitService).validateAndRegisterAttempt(userId);
-        verify(otpCodeRepository).createOtpCode(any(OtpCode.class));
+        verify(otpCodeRepository).createOtpCodeReplacingActive(any(OtpCode.class));
         verify(fileDeliveryService).saveOtpToFile(
                 eq("otp-fail.txt"),
                 eq(userId),

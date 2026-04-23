@@ -80,14 +80,8 @@ public class OtpService {
 
         generateOtpRateLimitService.validateAndRegisterAttempt(userId);
 
-        int expiredPreviousCodes = otpCodeRepository.expireActiveCodesForUserOperation(userId, operationId);
-        if (expiredPreviousCodes > 0) {
-            log.info("Expired previous active OTP codes before new generation: userId={}, operationId={}, expiredCount={}",
-                    userId, operationId, expiredPreviousCodes);
-        }
-
         OtpCode otpCode = buildOtpCode(userId, operationId, channel, deliveryTarget, code, now, expiresAt);
-        Long otpId = otpCodeRepository.createOtpCode(otpCode);
+        Long otpId = otpCodeRepository.createOtpCodeReplacingActive(otpCode);
 
         try {
             deliverOtp(otpId, userId, otpCode, code, expiresAt);
