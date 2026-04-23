@@ -1,6 +1,8 @@
 package org.example.service;
 
 import org.example.dto.GenerateOtpRequest;
+import org.example.dto.OtpGenerationResponse;
+import org.example.dto.OtpValidationResponse;
 import org.example.dto.ValidateOtpRequest;
 import org.example.exception.NotFoundException;
 import org.example.exception.RateLimitExceededException;
@@ -22,12 +24,22 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 
-import org.example.dto.OtpGenerationResponse;
-import org.example.dto.OtpValidationResponse;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OtpServiceTest {
@@ -312,26 +324,10 @@ class OtpServiceTest {
     void generateOtp_shouldThrowIllegalArgumentException_whenFileTargetIsMissing() {
         Long userId = 16L;
 
-        User user = new User();
-        user.setId(userId);
-        user.setLogin("user_file_missing");
-        user.setRole(Role.USER);
-        user.setEmail("user_file_missing@test.com");
-        user.setPhone("+37400112233");
-        user.setTelegramChatId("123456789");
-
-        OtpConfig config = new OtpConfig();
-        config.setId(1);
-        config.setCodeLength(6);
-        config.setTtlSeconds(300);
-
         GenerateOtpRequest request = new GenerateOtpRequest();
         request.setOperationId("payment-file-002");
         request.setDeliveryChannel(DeliveryChannel.FILE);
         request.setDeliveryTarget("   ");
-
-        when(userRepository.findById(userId)).thenReturn(user);
-        when(otpConfigRepository.getConfig()).thenReturn(config);
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -340,9 +336,16 @@ class OtpServiceTest {
 
         assertEquals("Delivery target is required", exception.getMessage());
 
-        verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
-        verify(otpCodeRepository, never()).createOtpCodeReplacingActive(any(OtpCode.class));
-        verifyNoInteractions(fileDeliveryService);
+        verifyNoInteractions(
+                userRepository,
+                otpConfigRepository,
+                generateOtpRateLimitService,
+                otpCodeRepository,
+                fileDeliveryService,
+                emailDeliveryService,
+                telegramDeliveryService,
+                smsDeliveryService
+        );
     }
 
     @Test
@@ -371,6 +374,90 @@ class OtpServiceTest {
 
         verify(generateOtpRateLimitService, never()).validateAndRegisterAttempt(anyLong());
         verify(otpCodeRepository, never()).createOtpCodeReplacingActive(any(OtpCode.class));
+    }
+
+    @Test
+    void generateOtp_shouldThrowIllegalArgumentException_whenEmailChannelContainsDeliveryTarget() {
+        Long userId = 40L;
+
+        GenerateOtpRequest request = new GenerateOtpRequest();
+        request.setOperationId("payment-email-extra-target-001");
+        request.setDeliveryChannel(DeliveryChannel.EMAIL);
+        request.setDeliveryTarget("other@example.com");
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> otpService.generateOtp(userId, request)
+        );
+
+        assertEquals("Delivery target must not be provided for EMAIL channel", exception.getMessage());
+
+        verifyNoInteractions(
+                userRepository,
+                otpConfigRepository,
+                generateOtpRateLimitService,
+                otpCodeRepository,
+                fileDeliveryService,
+                emailDeliveryService,
+                telegramDeliveryService,
+                smsDeliveryService
+        );
+    }
+
+    @Test
+    void generateOtp_shouldThrowIllegalArgumentException_whenSmsChannelContainsDeliveryTarget() {
+        Long userId = 41L;
+
+        GenerateOtpRequest request = new GenerateOtpRequest();
+        request.setOperationId("payment-sms-extra-target-001");
+        request.setDeliveryChannel(DeliveryChannel.SMS);
+        request.setDeliveryTarget("+37499000000");
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> otpService.generateOtp(userId, request)
+        );
+
+        assertEquals("Delivery target must not be provided for SMS channel", exception.getMessage());
+
+        verifyNoInteractions(
+                userRepository,
+                otpConfigRepository,
+                generateOtpRateLimitService,
+                otpCodeRepository,
+                fileDeliveryService,
+                emailDeliveryService,
+                telegramDeliveryService,
+                smsDeliveryService
+        );
+    }
+
+    @Test
+    void generateOtp_shouldThrowIllegalArgumentException_whenTelegramChannelContainsDeliveryTarget() {
+        Long userId = 42L;
+
+        GenerateOtpRequest request = new GenerateOtpRequest();
+        request.setOperationId("payment-telegram-extra-target-001");
+        request.setDeliveryChannel(DeliveryChannel.TELEGRAM);
+        request.setDeliveryTarget("987654321");
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> otpService.generateOtp(userId, request)
+        );
+
+        assertEquals("Delivery target must not be provided for TELEGRAM channel", exception.getMessage());
+
+        verifyNoInteractions(
+                userRepository,
+                otpConfigRepository,
+                generateOtpRateLimitService,
+                otpCodeRepository,
+                fileDeliveryService,
+                emailDeliveryService,
+                telegramDeliveryService,
+                smsDeliveryService
+        );
     }
 
     @Test
@@ -553,5 +640,4 @@ class OtpServiceTest {
 
         verifyNoInteractions(emailDeliveryService, telegramDeliveryService, smsDeliveryService);
     }
-
 }

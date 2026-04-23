@@ -1,6 +1,7 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.example.integration.support.TestRequests;
 import org.example.model.User;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,18 +44,13 @@ class OtpAuthApiITTest extends BaseIntegrationTest {
 
     @Test
     void generateOtp_shouldReturnUnauthorized_whenTokenIsMissing() throws Exception {
-        String requestBody = """
-                {
-                  "operationId": "payment-auth-missing-token-001",
-                  "deliveryChannel": "FILE",
-                  "deliveryTarget": "%s"
-                }
-                """.formatted(escapeBackslashes(otpFile.toString()));
-
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
+        HttpEntity<?> entity = new HttpEntity<>(
+                TestRequests.generateFileOtp("payment-auth-missing-token-001", otpFile.toString()),
+                headers
+        );
 
         ResponseEntity<String> response =
                 restTemplate.postForEntity("/otp/generate", entity, String.class);
@@ -68,17 +64,13 @@ class OtpAuthApiITTest extends BaseIntegrationTest {
 
     @Test
     void validateOtp_shouldReturnUnauthorized_whenTokenIsMissing() throws Exception {
-        String requestBody = """
-                {
-                  "operationId": "payment-auth-validate-001",
-                  "code": "123456"
-                }
-                """;
-
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
+        HttpEntity<?> entity = new HttpEntity<>(
+                TestRequests.validateOtp("payment-auth-validate-001", "123456"),
+                headers
+        );
 
         ResponseEntity<String> response =
                 restTemplate.postForEntity("/otp/validate", entity, String.class);
@@ -104,22 +96,11 @@ class OtpAuthApiITTest extends BaseIntegrationTest {
 
         assertEquals(HttpStatus.OK, logoutResponse.getStatusCode());
 
-        String requestBody = """
-                {
-                  "operationId": "payment-after-logout-001",
-                  "deliveryChannel": "FILE",
-                  "deliveryTarget": "%s"
-                }
-                """.formatted(escapeBackslashes(otpFile.toString()));
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(token);
-
-        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
-
-        ResponseEntity<String> response =
-                restTemplate.postForEntity("/otp/generate", entity, String.class);
+        ResponseEntity<String> response = postAuthorized(
+                "/otp/generate",
+                token,
+                TestRequests.generateFileOtp("payment-after-logout-001", otpFile.toString())
+        );
 
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
         assertNotNull(response.getBody());

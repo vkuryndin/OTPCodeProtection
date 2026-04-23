@@ -1,9 +1,7 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.example.dto.GenerateOtpRequest;
 import org.example.integration.support.TestRequests;
-import org.example.model.DeliveryChannel;
 import org.example.model.User;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +55,12 @@ class OtpConcurrentBruteforceApiITTest extends BaseIntegrationTest {
         String token = loginAndGetToken(testLogin);
         String operationId = "payment-bruteforce-001";
 
-        generateOtp(token, operationId);
+        ResponseEntity<String> generateResponse = postAuthorized(
+                "/otp/generate",
+                token,
+                TestRequests.generateFileOtp(operationId, otpFile.toString())
+        );
+        assertEquals(HttpStatus.CREATED, generateResponse.getStatusCode());
 
         ExecutorService executor = Executors.newFixedThreadPool(5);
         CountDownLatch startLatch = new CountDownLatch(1);
@@ -103,15 +106,5 @@ class OtpConcurrentBruteforceApiITTest extends BaseIntegrationTest {
 
         JsonNode blockedBody = objectMapper.readTree(blockedResponse.getBody());
         assertEquals("Too many invalid OTP attempts. Try again later.", blockedBody.get("error").asText());
-    }
-
-    private void generateOtp(String token, String operationId) {
-        GenerateOtpRequest request = new GenerateOtpRequest();
-        request.setOperationId(operationId);
-        request.setDeliveryChannel(DeliveryChannel.FILE);
-        request.setDeliveryTarget(otpFile.toString());
-
-        ResponseEntity<String> response = postAuthorized("/otp/generate", token, request);
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
     }
 }

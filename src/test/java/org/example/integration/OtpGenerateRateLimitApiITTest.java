@@ -1,12 +1,14 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.example.integration.support.TestRequests;
 import org.example.model.User;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -52,9 +54,21 @@ class OtpGenerateRateLimitApiITTest extends BaseIntegrationTest {
     void generateOtp_shouldReturnTooManyRequests_whenGenerateRateLimitIsExceeded() throws Exception {
         String token = loginAndGetToken(testLogin);
 
-        ResponseEntity<String> firstResponse = generateOtp(token, "rate-limit-op-001");
-        ResponseEntity<String> secondResponse = generateOtp(token, "rate-limit-op-002");
-        ResponseEntity<String> thirdResponse = generateOtp(token, "rate-limit-op-003");
+        ResponseEntity<String> firstResponse = postAuthorized(
+                "/otp/generate",
+                token,
+                TestRequests.generateFileOtp("rate-limit-op-001", otpFile.toString())
+        );
+        ResponseEntity<String> secondResponse = postAuthorized(
+                "/otp/generate",
+                token,
+                TestRequests.generateFileOtp("rate-limit-op-002", otpFile.toString())
+        );
+        ResponseEntity<String> thirdResponse = postAuthorized(
+                "/otp/generate",
+                token,
+                TestRequests.generateFileOtp("rate-limit-op-003", otpFile.toString())
+        );
 
         assertEquals(HttpStatus.CREATED, firstResponse.getStatusCode());
         assertEquals(HttpStatus.CREATED, secondResponse.getStatusCode());
@@ -63,17 +77,5 @@ class OtpGenerateRateLimitApiITTest extends BaseIntegrationTest {
 
         JsonNode body = objectMapper.readTree(thirdResponse.getBody());
         assertEquals("Too many OTP generation requests. Try again later.", body.get("error").asText());
-    }
-
-    private ResponseEntity<String> generateOtp(String token, String operationId) {
-        String requestBody = """
-                {
-                  "operationId": "%s",
-                  "deliveryChannel": "FILE",
-                  "deliveryTarget": "%s"
-                }
-                """.formatted(operationId, escapeBackslashes(otpFile.toString()));
-
-        return postAuthorizedJson("/otp/generate", token, requestBody);
     }
 }

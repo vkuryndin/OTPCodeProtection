@@ -57,7 +57,7 @@ POST {{host}}/auth/login
 Content-Type: application/json
 
 {
-  "login": "user_5",
+  "login": "user_7",
   "password": "12345678"
 }
 
@@ -158,6 +158,20 @@ Content-Type: application/json
   "phone": "+37400112233",
   "telegramChatId": "123456789"
 }
+
+### Register user - valid
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "login": "user_7",
+  "password": "12345678",
+  "role": "USER",
+  "email": "akondratev01@gmail.com",
+  "phone": "+37400112233",
+  "telegramChatId": "123456789"
+}
+
 ### =====================================
 ### 3. REGISTER - VALIDATION ERRORS
 ### =====================================

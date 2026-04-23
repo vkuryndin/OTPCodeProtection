@@ -162,6 +162,8 @@ public class OtpService {
                     userId, request.getOperationId());
             throw new IllegalArgumentException("Delivery channel is required");
         }
+
+        validateDeliveryTargetRules(userId, request);
     }
 
     private void validateValidateRequest(Long userId, ValidateOtpRequest request) {
@@ -306,14 +308,7 @@ public class OtpService {
 
     private String resolveDeliveryTarget(Long userId, User user, GenerateOtpRequest request) {
         return switch (request.getDeliveryChannel()) {
-            case FILE -> {
-                if (request.getDeliveryTarget() == null || request.getDeliveryTarget().isBlank()) {
-                    log.warn("OTP generation failed: file target is missing, userId={}, operationId={}",
-                            userId, request.getOperationId());
-                    throw new IllegalArgumentException("Delivery target is required");
-                }
-                yield request.getDeliveryTarget().trim();
-            }
+            case FILE -> request.getDeliveryTarget().trim();
             case EMAIL -> {
                 if (user.getEmail() == null || user.getEmail().isBlank()) {
                     log.warn("OTP generation failed: user email is not set, userId={}, login={}",
@@ -402,6 +397,28 @@ public class OtpService {
     private void validateMaxLength(String value, int maxLength, String message) {
         if (value != null && value.length() > maxLength) {
             throw new IllegalArgumentException(message);
+        }
+    }
+
+    private void validateDeliveryTargetRules(Long userId, GenerateOtpRequest request) {
+        DeliveryChannel channel = request.getDeliveryChannel();
+        String deliveryTarget = request.getDeliveryTarget();
+
+        if (channel == DeliveryChannel.FILE) {
+            if (deliveryTarget == null || deliveryTarget.isBlank()) {
+                log.warn("OTP generation failed: file target is missing, userId={}, operationId={}",
+                        userId, request.getOperationId());
+                throw new IllegalArgumentException("Delivery target is required");
+            }
+            return;
+        }
+
+        if (deliveryTarget != null) {
+            log.warn("OTP generation failed: delivery target must not be provided, userId={}, operationId={}, channel={}",
+                    userId, request.getOperationId(), channel);
+            throw new IllegalArgumentException(
+                    "Delivery target must not be provided for " + channel.name() + " channel"
+            );
         }
     }
 

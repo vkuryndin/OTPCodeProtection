@@ -1,12 +1,14 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.example.integration.support.TestRequests;
 import org.example.model.User;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -58,12 +60,20 @@ class OtpGenerateConcurrentRateLimitApiITTest extends BaseIntegrationTest {
 
         Callable<ResponseEntity<String>> task1 = () -> {
             startLatch.await(5, TimeUnit.SECONDS);
-            return generateOtp(token, "rate-limit-parallel-001");
+            return postAuthorized(
+                    "/otp/generate",
+                    token,
+                    TestRequests.generateFileOtp("rate-limit-parallel-001", otpFile.toString())
+            );
         };
 
         Callable<ResponseEntity<String>> task2 = () -> {
             startLatch.await(5, TimeUnit.SECONDS);
-            return generateOtp(token, "rate-limit-parallel-002");
+            return postAuthorized(
+                    "/otp/generate",
+                    token,
+                    TestRequests.generateFileOtp("rate-limit-parallel-002", otpFile.toString())
+            );
         };
 
         Future<ResponseEntity<String>> firstFuture = executor.submit(task1);
@@ -106,17 +116,5 @@ class OtpGenerateConcurrentRateLimitApiITTest extends BaseIntegrationTest {
             JsonNode body = objectMapper.readTree(secondResponse.getBody());
             assertEquals("Too many OTP generation requests. Try again later.", body.get("error").asText());
         }
-    }
-
-    private ResponseEntity<String> generateOtp(String token, String operationId) {
-        String requestBody = """
-                {
-                  "operationId": "%s",
-                  "deliveryChannel": "FILE",
-                  "deliveryTarget": "%s"
-                }
-                """.formatted(operationId, escapeBackslashes(otpFile.toString()));
-
-        return postAuthorizedJson("/otp/generate", token, requestBody);
     }
 }

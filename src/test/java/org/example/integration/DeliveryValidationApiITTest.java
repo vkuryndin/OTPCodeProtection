@@ -1,12 +1,15 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.example.integration.support.TestRequests;
+import org.example.model.DeliveryChannel;
 import org.example.model.User;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.util.UUID;
 
@@ -61,89 +64,67 @@ class DeliveryValidationApiITTest extends BaseIntegrationTest {
     }
 
     @Test
-    void generateOtp_shouldReturnBadRequest_whenEmailChannelAndUserEmailIsMissing() throws Exception {
-        String token = loginAndGetToken(emailMissingLogin);
-
-        String requestBody = """
-                {
-                  "operationId": "payment-email-missing-001",
-                  "deliveryChannel": "EMAIL"
-                }
-                """;
-
-        ResponseEntity<String> response = generateOtpAuthorizedJson(token, requestBody);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("User email is not set", body.get("error").asText());
-    }
-
-    @Test
-    void generateOtp_shouldReturnBadRequest_whenSmsChannelAndUserPhoneIsMissing() throws Exception {
-        String token = loginAndGetToken(phoneMissingLogin);
-
-        String requestBody = """
-                {
-                  "operationId": "payment-sms-missing-001",
-                  "deliveryChannel": "SMS"
-                }
-                """;
-
-        ResponseEntity<String> response = generateOtpAuthorizedJson(token, requestBody);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("User phone is not set", body.get("error").asText());
-    }
-
-    @Test
-    void generateOtp_shouldReturnBadRequest_whenTelegramChannelAndChatIdIsMissing() throws Exception {
-        String token = loginAndGetToken(telegramMissingLogin);
-
-        String requestBody = """
-                {
-                  "operationId": "payment-telegram-missing-001",
-                  "deliveryChannel": "TELEGRAM"
-                }
-                """;
-
-        ResponseEntity<String> response = generateOtpAuthorizedJson(token, requestBody);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("User telegram chat id is not set", body.get("error").asText());
-    }
-
-    @Test
-    void generateOtp_shouldReturnBadRequest_whenFileChannelAndDeliveryTargetIsMissing() throws Exception {
+    void generateOtp_shouldReturnBadRequest_whenEmailChannelContainsDeliveryTarget() throws Exception {
         String token = loginAndGetToken(fileLogin);
 
         String requestBody = """
-                {
-                  "operationId": "payment-file-missing-001",
-                  "deliveryChannel": "FILE"
-                }
-                """;
+            {
+              "operationId": "payment-email-extra-target-001",
+              "deliveryChannel": "EMAIL",
+              "deliveryTarget": "other@example.com"
+            }
+            """;
 
-        ResponseEntity<String> response = generateOtpAuthorizedJson(token, requestBody);
+        ResponseEntity<String> response = postAuthorizedJson("/otp/generate", token, requestBody);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
 
         JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("Delivery target is required", body.get("error").asText());
+        assertEquals("Delivery target must not be provided for EMAIL channel", body.get("error").asText());
     }
 
-    private ResponseEntity<String> generateOtpAuthorizedJson(String token, String requestBody) {
-        return postAuthorizedJson("/otp/generate", token, requestBody);
+    @Test
+    void generateOtp_shouldReturnBadRequest_whenSmsChannelContainsDeliveryTarget() throws Exception {
+        String token = loginAndGetToken(fileLogin);
+
+        String requestBody = """
+            {
+              "operationId": "payment-sms-extra-target-001",
+              "deliveryChannel": "SMS",
+              "deliveryTarget": "+37499000000"
+            }
+            """;
+
+        ResponseEntity<String> response = postAuthorizedJson("/otp/generate", token, requestBody);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals("Delivery target must not be provided for SMS channel", body.get("error").asText());
     }
 
+    @Test
+    void generateOtp_shouldReturnBadRequest_whenTelegramChannelContainsDeliveryTarget() throws Exception {
+        String token = loginAndGetToken(fileLogin);
+
+        String requestBody = """
+            {
+              "operationId": "payment-telegram-extra-target-001",
+              "deliveryChannel": "TELEGRAM",
+              "deliveryTarget": "123456789"
+            }
+            """;
+
+        ResponseEntity<String> response = postAuthorizedJson("/otp/generate", token, requestBody);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals("Delivery target must not be provided for TELEGRAM channel", body.get("error").asText());
+    }
     private String shortId() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     }
