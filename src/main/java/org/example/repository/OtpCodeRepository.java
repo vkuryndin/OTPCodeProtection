@@ -86,13 +86,6 @@ public class OtpCodeRepository {
             SELECT pg_advisory_xact_lock(?, ?)
             """;
 
-    public Long createOtpCode(OtpCode otpCode) {
-        try (Connection connection = ConnectionFactory.getConnection()) {
-            return insertOtpCode(connection, otpCode);
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to create OTP code", e);
-        }
-    }
 
     public Long createOtpCodeReplacingActive(OtpCode otpCode) {
         try (Connection connection = ConnectionFactory.getConnection()) {
@@ -148,14 +141,6 @@ public class OtpCodeRepository {
             return statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to expire OTP codes", e);
-        }
-    }
-
-    public int expireActiveCodesForUserOperation(Long userId, String operationId) {
-        try (Connection connection = ConnectionFactory.getConnection()) {
-            return expireActiveCodesForUserOperation(connection, userId, operationId);
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to expire active OTP codes for user and operation", e);
         }
     }
 

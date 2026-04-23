@@ -10,6 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
+
 @Service
 public class AuthService {
 
@@ -36,7 +38,7 @@ public class AuthService {
     public Long register(RegisterRequest request) {
         validateRegisterRequest(request);
 
-        String normalizedLogin = request.getLogin().trim();
+        String normalizedLogin = normalizeLogin(request.getLogin());
 
         if (userRepository.findByLogin(normalizedLogin) != null) {
             throw new IllegalArgumentException("User with this login already exists");
@@ -77,7 +79,7 @@ public class AuthService {
 
         validateLoginFieldLengths(login, password);
 
-        String normalizedLogin = login.trim();
+        String normalizedLogin = normalizeLogin(login);
         User user = userRepository.findByLogin(normalizedLogin);
 
         if (user == null) {
@@ -145,6 +147,10 @@ public class AuthService {
         if (value != null && value.length() > maxLength) {
             throw new IllegalArgumentException(message);
         }
+    }
+
+    private String normalizeLogin(String login) {
+        return login.trim().toLowerCase(Locale.ROOT);
     }
 
     private String emptyToNull(String value) {
