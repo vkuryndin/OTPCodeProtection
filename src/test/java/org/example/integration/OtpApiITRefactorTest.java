@@ -27,6 +27,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.UUID;
+import java.util.concurrent.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -231,6 +232,66 @@ class OtpApiITRefactorTest {
 
         JsonNode secondBody = objectMapper.readTree(secondValidation.getBody());
         assertEquals("OTP validated successfully", secondBody.get("message").asText());
+    }
+
+    @Test
+    void validateOldOtpAndGenerateNewOtpConcurrently_shouldKeepConsistentState() throws Exception {
+        String token = loginAndGetToken();
+        String operationId = "payment-file-generate-validate-race-001";
+
+        String oldCode = generateOtpAndReadCode(token, operationId);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        Callable<ResponseEntity<String>> generateTask = () -> {
+            startLatch.await(5, TimeUnit.SECONDS);
+
+            GenerateOtpRequest request = new GenerateOtpRequest();
+            request.setOperationId(operationId);
+            request.setDeliveryChannel(DeliveryChannel.FILE);
+            request.setDeliveryTarget(otpFile.toString());
+
+            return postAuthorized("/otp/generate", token, request);
+        };
+
+        Callable<ResponseEntity<String>> validateTask = () -> {
+            startLatch.await(5, TimeUnit.SECONDS);
+
+            ValidateOtpRequest request = new ValidateOtpRequest();
+            request.setOperationId(operationId);
+            request.setCode(oldCode);
+
+            return postAuthorized("/otp/validate", token, request);
+        };
+
+        Future<ResponseEntity<String>> generateFuture = executor.submit(generateTask);
+        Future<ResponseEntity<String>> validateFuture = executor.submit(validateTask);
+
+        startLatch.countDown();
+
+        ResponseEntity<String> generateResponse = generateFuture.get(10, TimeUnit.SECONDS);
+        ResponseEntity<String> validateResponse = validateFuture.get(10, TimeUnit.SECONDS);
+
+        executor.shutdownNow();
+
+        assertEquals(HttpStatus.CREATED, generateResponse.getStatusCode());
+
+        if (validateResponse.getStatusCode() == HttpStatus.OK) {
+            assertNotNull(validateResponse.getBody());
+            JsonNode body = objectMapper.readTree(validateResponse.getBody());
+            assertEquals("OTP validated successfully", body.get("message").asText());
+        } else {
+            assertEquals(HttpStatus.BAD_REQUEST, validateResponse.getStatusCode());
+            assertNotNull(validateResponse.getBody());
+            JsonNode body = objectMapper.readTree(validateResponse.getBody());
+            assertEquals("Invalid or expired OTP code", body.get("error").asText());
+        }
+
+        assertEquals(1, countOtpCodesByStatus(testUserId, operationId, "ACTIVE"));
+        assertEquals(1,
+                countOtpCodesByStatus(testUserId, operationId, "USED")
+                        + countOtpCodesByStatus(testUserId, operationId, "EXPIRED"));
     }
 
     private String loginAndGetToken() throws Exception {
