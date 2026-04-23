@@ -1,7 +1,7 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.example.dto.LoginRequest;
+import org.example.integration.support.TestRequests;
 import org.example.model.User;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,14 +36,10 @@ class AuthApiITTest extends BaseIntegrationTest {
 
     @Test
     void login_shouldReturnToken_whenCredentialsAreValid() throws Exception {
-        LoginRequest request = new LoginRequest();
-        request.setLogin(testLogin);
-        request.setPassword(PASSWORD);
-
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        HttpEntity<LoginRequest> entity = new HttpEntity<>(request, headers);
+        HttpEntity<?> entity = new HttpEntity<>(TestRequests.login(testLogin, PASSWORD), headers);
 
         ResponseEntity<String> response =
                 restTemplate.postForEntity("/auth/login", entity, String.class);
@@ -52,7 +48,6 @@ class AuthApiITTest extends BaseIntegrationTest {
         assertNotNull(response.getBody());
 
         JsonNode body = objectMapper.readTree(response.getBody());
-
         assertEquals("Login successful", body.get("message").asText());
         assertEquals(testLogin, body.get("login").asText());
         assertEquals("USER", body.get("role").asText());
@@ -62,14 +57,13 @@ class AuthApiITTest extends BaseIntegrationTest {
 
     @Test
     void login_shouldReturnToken_whenLoginHasDifferentCase() throws Exception {
-        LoginRequest request = new LoginRequest();
-        request.setLogin(testLogin.toUpperCase(Locale.ROOT));
-        request.setPassword(PASSWORD);
-
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        HttpEntity<LoginRequest> entity = new HttpEntity<>(request, headers);
+        HttpEntity<?> entity = new HttpEntity<>(
+                TestRequests.login(testLogin.toUpperCase(Locale.ROOT), PASSWORD),
+                headers
+        );
 
         ResponseEntity<String> response =
                 restTemplate.postForEntity("/auth/login", entity, String.class);
@@ -78,7 +72,6 @@ class AuthApiITTest extends BaseIntegrationTest {
         assertNotNull(response.getBody());
 
         JsonNode body = objectMapper.readTree(response.getBody());
-
         assertEquals("Login successful", body.get("message").asText());
         assertEquals(testLogin, body.get("login").asText());
         assertEquals("USER", body.get("role").asText());
@@ -88,14 +81,10 @@ class AuthApiITTest extends BaseIntegrationTest {
 
     @Test
     void login_shouldReturnBadRequest_whenPasswordIsWrong() throws Exception {
-        LoginRequest request = new LoginRequest();
-        request.setLogin(testLogin);
-        request.setPassword("wrongpass");
-
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        HttpEntity<LoginRequest> entity = new HttpEntity<>(request, headers);
+        HttpEntity<?> entity = new HttpEntity<>(TestRequests.login(testLogin, "wrongpass"), headers);
 
         ResponseEntity<String> response =
                 restTemplate.postForEntity("/auth/login", entity, String.class);
@@ -137,7 +126,6 @@ class AuthApiITTest extends BaseIntegrationTest {
 
         ResponseEntity<String> firstResponse =
                 restTemplate.postForEntity("/auth/logout", entity, String.class);
-
         assertEquals(HttpStatus.OK, firstResponse.getStatusCode());
 
         ResponseEntity<String> secondResponse =

@@ -1,5 +1,7 @@
 package org.example.integration;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -8,13 +10,15 @@ import org.springframework.http.ResponseEntity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class HealthApiITTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     void health_shouldReturnOk() {
@@ -26,16 +30,15 @@ class HealthApiITTest {
     }
 
     @Test
-    void healthDb_shouldReturnUpAndTestDatabaseName() {
+    void healthDb_shouldReturnUpAndTestDatabaseName() throws Exception {
         ResponseEntity<String> response =
                 restTemplate.getForEntity("/health/db", String.class);
 
         assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
 
-        String body = response.getBody();
-        assertNotNull(body);
-
-        assertTrue(body.contains("\"status\":\"UP\""));
-        assertTrue(body.contains("\"database\":\"otp_service_test\""));
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals("UP", body.get("status").asText());
+        assertEquals("otp_service_test", body.get("database").asText());
     }
 }

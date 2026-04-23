@@ -1,45 +1,20 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.model.Role;
 import org.example.model.User;
-import org.example.repository.ConnectionFactory;
-import org.example.repository.UserRepository;
-import org.example.security.PasswordHasher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Locale;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class RegisterApiITRefactorTest {
-
-    private static final String PASSWORD = "12345678";
-
-    @Autowired
-    private TestRestTemplate restTemplate;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PasswordHasher passwordHasher;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+class RegisterApiITRefactorTest extends BaseIntegrationTest {
 
     private String userLogin;
     private String duplicateLogin;
@@ -58,20 +33,10 @@ class RegisterApiITRefactorTest {
         deleteUserByLogin(existingAdminLogin);
         deleteUserByLogin(secondAdminLogin);
 
-        User existingUser = new User();
-        existingUser.setLogin(duplicateLogin);
-        existingUser.setPasswordHash(passwordHasher.hash(PASSWORD));
-        existingUser.setRole(Role.USER);
-        existingUser.setEmail(duplicateLogin + "@test.com");
-        existingUser.setPhone("+37400112233");
+        User existingUser = createUser(duplicateLogin);
         userRepository.createUser(existingUser);
 
-        User existingAdmin = new User();
-        existingAdmin.setLogin(existingAdminLogin);
-        existingAdmin.setPasswordHash(passwordHasher.hash(PASSWORD));
-        existingAdmin.setRole(Role.ADMIN);
-        existingAdmin.setEmail(existingAdminLogin + "@test.com");
-        existingAdmin.setPhone("+37400110000");
+        User existingAdmin = createAdmin(existingAdminLogin);
         userRepository.createUser(existingAdmin);
     }
 
@@ -204,53 +169,6 @@ class RegisterApiITRefactorTest {
 
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
         return restTemplate.postForEntity("/auth/register", entity, String.class);
-    }
-
-    private boolean userExistsByLoginIgnoreCase(String login) {
-        String sql = "SELECT COUNT(*) FROM users WHERE LOWER(login) = LOWER(?)";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setString(1, login);
-
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getLong(1) > 0;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to check user existence by login", e);
-        }
-    }
-
-    private boolean userExistsByLoginExact(String login) {
-        String sql = "SELECT COUNT(*) FROM users WHERE login = ?";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setString(1, login);
-
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getLong(1) > 0;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to check user existence by exact login", e);
-        }
-    }
-
-    private void deleteUserByLogin(String login) {
-        String sql = "DELETE FROM users WHERE LOWER(login) = LOWER(?)";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setString(1, login);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete test user", e);
-        }
     }
 
     private String shortId() {

@@ -1,25 +1,14 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.dto.LoginRequest;
-import org.example.model.Role;
+import org.example.integration.support.TestDbHelper;
 import org.example.model.User;
-import org.example.repository.ConnectionFactory;
-import org.example.repository.UserRepository;
-import org.example.security.PasswordHasher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -27,21 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class TelegramBindingApiITTest {
-
-    private static final String PASSWORD = "12345678";
-
-    @Autowired
-    private TestRestTemplate restTemplate;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PasswordHasher passwordHasher;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+class TelegramBindingApiITTest extends BaseIntegrationTest {
 
     private String noEmailLogin;
     private String noBindTokenLogin;
@@ -57,31 +32,17 @@ class TelegramBindingApiITTest {
         deleteUserByLogin(noBindTokenLogin);
         deleteUserByLogin(expiredBindLogin);
 
-        User noEmailUser = new User();
-        noEmailUser.setLogin(noEmailLogin);
-        noEmailUser.setPasswordHash(passwordHasher.hash(PASSWORD));
-        noEmailUser.setRole(Role.USER);
+        User noEmailUser = createUser(noEmailLogin);
         noEmailUser.setEmail(null);
-        noEmailUser.setPhone("+37400112233");
         userRepository.createUser(noEmailUser);
 
-        User noBindTokenUser = new User();
-        noBindTokenUser.setLogin(noBindTokenLogin);
-        noBindTokenUser.setPasswordHash(passwordHasher.hash(PASSWORD));
-        noBindTokenUser.setRole(Role.USER);
-        noBindTokenUser.setEmail(noBindTokenLogin + "@test.com");
-        noBindTokenUser.setPhone("+37400112233");
+        User noBindTokenUser = createUser(noBindTokenLogin);
         userRepository.createUser(noBindTokenUser);
 
-        User expiredBindUser = new User();
-        expiredBindUser.setLogin(expiredBindLogin);
-        expiredBindUser.setPasswordHash(passwordHasher.hash(PASSWORD));
-        expiredBindUser.setRole(Role.USER);
-        expiredBindUser.setEmail(expiredBindLogin + "@test.com");
-        expiredBindUser.setPhone("+37400112233");
+        User expiredBindUser = createUser(expiredBindLogin);
         Long expiredBindUserId = userRepository.createUser(expiredBindUser);
 
-        updateTelegramBindState(
+        TestDbHelper.updateTelegramBindState(
                 expiredBindUserId,
                 "expired-bind-token-" + shortId(),
                 LocalDateTime.now().minusMinutes(5)
@@ -162,58 +123,6 @@ class TelegramBindingApiITTest {
 
         JsonNode body = objectMapper.readTree(response.getBody());
         assertEquals("Telegram bind token expired", body.get("error").asText());
-    }
-
-    private String loginAndGetToken(String login) throws Exception {
-        LoginRequest request = new LoginRequest();
-        request.setLogin(login);
-        request.setPassword(PASSWORD);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        HttpEntity<LoginRequest> entity = new HttpEntity<>(request, headers);
-
-        ResponseEntity<String> response =
-                restTemplate.postForEntity("/auth/login", entity, String.class);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        return body.get("token").asText();
-    }
-
-    private void updateTelegramBindState(Long userId, String bindToken, LocalDateTime expiresAt) {
-        String sql = """
-                UPDATE users
-                SET telegram_bind_token = ?, telegram_bind_expires_at = ?
-                WHERE id = ?
-                """;
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setString(1, bindToken);
-            statement.setTimestamp(2, Timestamp.valueOf(expiresAt));
-            statement.setLong(3, userId);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to update telegram bind state", e);
-        }
-    }
-
-    private void deleteUserByLogin(String login) {
-        String sql = "DELETE FROM users WHERE login = ?";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setString(1, login);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete test user", e);
-        }
     }
 
     private String shortId() {

@@ -3,11 +3,11 @@ package org.example.integration;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.dto.LoginRequest;
-import org.example.model.Role;
 import org.example.model.User;
-import org.example.repository.ConnectionFactory;
 import org.example.repository.UserRepository;
 import org.example.security.PasswordHasher;
+import org.example.integration.support.TestDbHelper;
+import org.example.integration.support.TestUsers;
 import org.junit.jupiter.api.Assertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -16,10 +16,6 @@ import org.springframework.http.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 
 public abstract class BaseIntegrationTest {
 
@@ -92,63 +88,23 @@ public abstract class BaseIntegrationTest {
     }
 
     protected void deleteUserByLogin(String login) {
-        String sql = "DELETE FROM users WHERE LOWER(login) = LOWER(?)";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setString(1, login);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete test user", e);
-        }
+        TestDbHelper.deleteUserByLogin(login);
     }
 
     protected void resetOtpConfig() {
-        setOtpConfig(6, 300);
+        TestDbHelper.resetOtpConfig();
     }
 
     protected void setOtpConfig(int codeLength, int ttlSeconds) {
-        String sql = """
-                INSERT INTO otp_config (id, code_length, ttl_seconds, updated_at)
-                VALUES (1, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT (id)
-                DO UPDATE SET
-                    code_length = EXCLUDED.code_length,
-                    ttl_seconds = EXCLUDED.ttl_seconds,
-                    updated_at = CURRENT_TIMESTAMP
-                """;
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setInt(1, codeLength);
-            statement.setInt(2, ttlSeconds);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to update OTP config", e);
-        }
+        TestDbHelper.setOtpConfig(codeLength, ttlSeconds);
     }
 
     protected User createUser(String login) {
-        User user = new User();
-        user.setLogin(login);
-        user.setPasswordHash(passwordHasher.hash(PASSWORD));
-        user.setRole(Role.USER);
-        user.setEmail(login + "@test.com");
-        user.setPhone("+37400112233");
-        user.setTelegramChatId("123456789");
-        return user;
+        return TestUsers.user(login, passwordHasher.hash(PASSWORD));
     }
 
     protected User createAdmin(String login) {
-        User admin = new User();
-        admin.setLogin(login);
-        admin.setPasswordHash(passwordHasher.hash(PASSWORD));
-        admin.setRole(Role.ADMIN);
-        admin.setEmail(login + "@test.com");
-        admin.setPhone("+37400110000");
-        return admin;
+        return TestUsers.admin(login, passwordHasher.hash(PASSWORD));
     }
 
     protected Path createOtpFile(String prefix, String login) throws IOException {
@@ -184,61 +140,22 @@ public abstract class BaseIntegrationTest {
     }
 
     protected long countOtpCodesByStatus(Long userId, String operationId, String status) {
-        String sql = """
-                SELECT COUNT(*)
-                FROM otp_codes
-                WHERE user_id = ?
-                  AND operation_id = ?
-                  AND status = ?::otp_status
-                """;
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setLong(1, userId);
-            statement.setString(2, operationId);
-            statement.setString(3, status);
-
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getLong(1);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to count OTP codes by status", e);
-        }
+        return TestDbHelper.countOtpCodesByStatus(userId, operationId, status);
     }
 
     protected long countOtpCodesByUserId(Long userId) {
-        String sql = "SELECT COUNT(*) FROM otp_codes WHERE user_id = ?";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setLong(1, userId);
-
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getLong(1);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to count otp_codes by user_id", e);
-        }
+        return TestDbHelper.countOtpCodesByUserId(userId);
     }
 
     protected boolean userExistsById(Long userId) {
-        String sql = "SELECT COUNT(*) FROM users WHERE id = ?";
+        return TestDbHelper.userExistsById(userId);
+    }
 
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+    protected boolean userExistsByLoginIgnoreCase(String login) {
+        return TestDbHelper.userExistsByLoginIgnoreCase(login);
+    }
 
-            statement.setLong(1, userId);
-
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getLong(1) > 0;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to check user existence", e);
-        }
+    protected boolean userExistsByLoginExact(String login) {
+        return TestDbHelper.userExistsByLoginExact(login);
     }
 }

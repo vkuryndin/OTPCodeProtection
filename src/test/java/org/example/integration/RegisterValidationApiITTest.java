@@ -1,29 +1,15 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.repository.ConnectionFactory;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class RegisterValidationApiITTest {
-
-    @Autowired
-    private TestRestTemplate restTemplate;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+class RegisterValidationApiITTest extends BaseIntegrationTest {
 
     @Test
     void register_shouldReturnBadRequest_whenLoginIsMissing() throws Exception {
@@ -152,18 +138,5 @@ class RegisterValidationApiITTest {
 
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
         return restTemplate.postForEntity("/auth/register", entity, String.class);
-    }
-
-    private void deleteUserByLogin(String login) {
-        String sql = "DELETE FROM users WHERE login = ?";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setString(1, login);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete test user", e);
-        }
     }
 }

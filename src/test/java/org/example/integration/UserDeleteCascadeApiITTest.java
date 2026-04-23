@@ -1,56 +1,29 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.dto.GenerateOtpRequest;
-import org.example.dto.LoginRequest;
 import org.example.model.DeliveryChannel;
-import org.example.model.Role;
 import org.example.model.User;
-import org.example.repository.ConnectionFactory;
-import org.example.repository.UserRepository;
-import org.example.security.PasswordHasher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class UserDeleteCascadeApiITTest {
-
-    private static final String PASSWORD = "12345678";
-
-    @Autowired
-    private TestRestTemplate restTemplate;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PasswordHasher passwordHasher;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+class UserDeleteCascadeApiITTest extends BaseIntegrationTest {
 
     private String adminLogin;
     private String userLogin;
 
     private Long userId;
-
     private Path otpFile;
 
     @BeforeEach
@@ -58,27 +31,15 @@ class UserDeleteCascadeApiITTest {
         adminLogin = "it_admin_del_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         userLogin = "it_user_del_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
 
-        otpFile = Path.of("build", "test-otp", "delete-" + userLogin + ".txt");
-        Files.createDirectories(otpFile.getParent());
-        Files.deleteIfExists(otpFile);
+        otpFile = createOtpFile("delete", userLogin);
 
         deleteUserByLogin(adminLogin);
         deleteUserByLogin(userLogin);
 
-        User admin = new User();
-        admin.setLogin(adminLogin);
-        admin.setPasswordHash(passwordHasher.hash(PASSWORD));
-        admin.setRole(Role.ADMIN);
-        admin.setEmail(adminLogin + "@test.com");
-        admin.setPhone("+37400110000");
+        User admin = createAdmin(adminLogin);
         userRepository.createUser(admin);
 
-        User user = new User();
-        user.setLogin(userLogin);
-        user.setPasswordHash(passwordHasher.hash(PASSWORD));
-        user.setRole(Role.USER);
-        user.setEmail(userLogin + "@test.com");
-        user.setPhone("+37400112233");
+        User user = createUser(userLogin);
         userId = userRepository.createUser(user);
 
         resetOtpConfig();
@@ -101,14 +62,7 @@ class UserDeleteCascadeApiITTest {
         generateRequest.setDeliveryChannel(DeliveryChannel.FILE);
         generateRequest.setDeliveryTarget(otpFile.toString());
 
-        HttpHeaders generateHeaders = new HttpHeaders();
-        generateHeaders.setContentType(MediaType.APPLICATION_JSON);
-        generateHeaders.setBearerAuth(userToken);
-
-        HttpEntity<GenerateOtpRequest> generateEntity = new HttpEntity<>(generateRequest, generateHeaders);
-
-        ResponseEntity<String> generateResponse =
-                restTemplate.postForEntity("/otp/generate", generateEntity, String.class);
+        ResponseEntity<String> generateResponse = postAuthorized("/otp/generate", userToken, generateRequest);
 
         assertEquals(HttpStatus.CREATED, generateResponse.getStatusCode());
         assertTrue(Files.exists(otpFile));
@@ -139,92 +93,5 @@ class UserDeleteCascadeApiITTest {
 
         assertFalse(userExistsById(userId), "User should be deleted");
         assertEquals(0, countOtpCodesByUserId(userId), "User OTP codes should be deleted by cascade");
-    }
-
-    private String loginAndGetToken(String login) throws Exception {
-        LoginRequest request = new LoginRequest();
-        request.setLogin(login);
-        request.setPassword(PASSWORD);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        HttpEntity<LoginRequest> entity = new HttpEntity<>(request, headers);
-
-        ResponseEntity<String> response =
-                restTemplate.postForEntity("/auth/login", entity, String.class);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        return body.get("token").asText();
-    }
-
-    private long countOtpCodesByUserId(Long userId) {
-        String sql = "SELECT COUNT(*) FROM otp_codes WHERE user_id = ?";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setLong(1, userId);
-
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getLong(1);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to count otp_codes by user_id", e);
-        }
-    }
-
-    private boolean userExistsById(Long userId) {
-        String sql = "SELECT COUNT(*) FROM users WHERE id = ?";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setLong(1, userId);
-
-            try (ResultSet rs = statement.executeQuery()) {
-                rs.next();
-                return rs.getLong(1) > 0;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to check user existence", e);
-        }
-    }
-
-    private void deleteUserByLogin(String login) {
-        String sql = "DELETE FROM users WHERE login = ?";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setString(1, login);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete test user", e);
-        }
-    }
-
-    private void resetOtpConfig() {
-        String sql = """
-                INSERT INTO otp_config (id, code_length, ttl_seconds, updated_at)
-                VALUES (1, 6, 300, CURRENT_TIMESTAMP)
-                ON CONFLICT (id)
-                DO UPDATE SET
-                    code_length = EXCLUDED.code_length,
-                    ttl_seconds = EXCLUDED.ttl_seconds,
-                    updated_at = CURRENT_TIMESTAMP
-                """;
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to reset OTP config", e);
-        }
     }
 }
