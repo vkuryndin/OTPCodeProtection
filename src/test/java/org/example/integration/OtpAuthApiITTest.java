@@ -1,47 +1,22 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.dto.LoginRequest;
-import org.example.model.Role;
 import org.example.model.User;
-import org.example.repository.ConnectionFactory;
-import org.example.repository.UserRepository;
-import org.example.security.PasswordHasher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class OtpAuthApiITTest {
-
-    private static final String PASSWORD = "12345678";
-
-    @Autowired
-    private TestRestTemplate restTemplate;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PasswordHasher passwordHasher;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+class OtpAuthApiITTest extends BaseIntegrationTest {
 
     private String testLogin;
     private Path otpFile;
@@ -49,20 +24,11 @@ class OtpAuthApiITTest {
     @BeforeEach
     void setUp() throws Exception {
         testLogin = "it_otp_auth_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        otpFile = Path.of("build", "test-otp", "otp-auth-" + testLogin + ".txt");
-
-        Files.createDirectories(otpFile.getParent());
-        Files.deleteIfExists(otpFile);
+        otpFile = createOtpFile("otp-auth", testLogin);
 
         deleteUserByLogin(testLogin);
 
-        User user = new User();
-        user.setLogin(testLogin);
-        user.setPasswordHash(passwordHasher.hash(PASSWORD));
-        user.setRole(Role.USER);
-        user.setEmail(testLogin + "@test.com");
-        user.setPhone("+37400112233");
-
+        User user = createUser(testLogin);
         userRepository.createUser(user);
 
         resetOtpConfig();
@@ -126,7 +92,7 @@ class OtpAuthApiITTest {
 
     @Test
     void generateOtp_shouldReturnUnauthorized_afterLogout() throws Exception {
-        String token = loginAndGetToken();
+        String token = loginAndGetToken(testLogin);
 
         HttpHeaders logoutHeaders = new HttpHeaders();
         logoutHeaders.setBearerAuth(token);
@@ -160,62 +126,5 @@ class OtpAuthApiITTest {
 
         JsonNode body = objectMapper.readTree(response.getBody());
         assertEquals("Invalid or expired token", body.get("error").asText());
-    }
-
-    private String loginAndGetToken() throws Exception {
-        LoginRequest request = new LoginRequest();
-        request.setLogin(testLogin);
-        request.setPassword(PASSWORD);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        HttpEntity<LoginRequest> entity = new HttpEntity<>(request, headers);
-
-        ResponseEntity<String> response =
-                restTemplate.postForEntity("/auth/login", entity, String.class);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        return body.get("token").asText();
-    }
-
-    private void deleteUserByLogin(String login) {
-        String sql = "DELETE FROM users WHERE login = ?";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setString(1, login);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete test user", e);
-        }
-    }
-
-    private void resetOtpConfig() {
-        String sql = """
-                INSERT INTO otp_config (id, code_length, ttl_seconds, updated_at)
-                VALUES (1, 6, 300, CURRENT_TIMESTAMP)
-                ON CONFLICT (id)
-                DO UPDATE SET
-                    code_length = EXCLUDED.code_length,
-                    ttl_seconds = EXCLUDED.ttl_seconds,
-                    updated_at = CURRENT_TIMESTAMP
-                """;
-
-        try (Connection connection = ConnectionFactory.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to reset OTP config", e);
-        }
-    }
-
-    private String escapeBackslashes(String value) {
-        return value.replace("\\", "\\\\");
     }
 }

@@ -37,7 +37,7 @@ public class RequestAuthService {
             throw new UnauthorizedException("Invalid or expired token");
         }
 
-        return new RequestUserContext(userId, token, user);
+        return new RequestUserContext(userId, token, user.getRole());
     }
 
     public Long extractUserId(HttpServletRequest request) {
@@ -57,12 +57,12 @@ public class RequestAuthService {
     public static final class RequestUserContext {
         private final Long userId;
         private final String token;
-        private final User user;
+        private final Role role;
 
-        public RequestUserContext(Long userId, String token, User user) {
+        public RequestUserContext(Long userId, String token, Role role) {
             this.userId = userId;
             this.token = token;
-            this.user = user;
+            this.role = role;
         }
 
         public Long userId() {
@@ -73,12 +73,8 @@ public class RequestAuthService {
             return token;
         }
 
-        public User user() {
-            return user;
-        }
-
         public Role role() {
-            return user.getRole();
+            return role;
         }
 
         public Long getUserId() {
@@ -89,12 +85,8 @@ public class RequestAuthService {
             return token;
         }
 
-        public User getUser() {
-            return user;
-        }
-
         public Role getRole() {
-            return user.getRole();
+            return role;
         }
     }
 }

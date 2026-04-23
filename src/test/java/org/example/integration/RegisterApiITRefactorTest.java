@@ -17,7 +17,9 @@ import org.springframework.http.*;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Locale;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -101,7 +103,33 @@ class RegisterApiITRefactorTest {
         JsonNode body = objectMapper.readTree(response.getBody());
         assertEquals("User registered successfully", body.get("message").asText());
         assertTrue(body.has("userId"));
-        assertTrue(userExistsByLogin(userLogin));
+        assertTrue(userExistsByLoginIgnoreCase(userLogin));
+    }
+
+    @Test
+    void register_shouldStoreLoginInLowerCase_whenMixedCaseLoginIsProvided() throws Exception {
+        String mixedCaseLogin = userLogin.toUpperCase(Locale.ROOT);
+
+        String requestBody = """
+                {
+                  "login": "%s",
+                  "password": "%s",
+                  "role": "USER",
+                  "email": "%s@test.com",
+                  "phone": "+37400112233"
+                }
+                """.formatted(mixedCaseLogin, PASSWORD, userLogin);
+
+        ResponseEntity<String> response = postRegisterJson(requestBody);
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals("User registered successfully", body.get("message").asText());
+
+        assertTrue(userExistsByLoginExact(userLogin));
+        assertFalse(userExistsByLoginExact(mixedCaseLogin));
     }
 
     @Test
@@ -115,6 +143,29 @@ class RegisterApiITRefactorTest {
                   "phone": "+37400112233"
                 }
                 """.formatted(duplicateLogin, PASSWORD, duplicateLogin);
+
+        ResponseEntity<String> response = postRegisterJson(requestBody);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals("User with this login already exists", body.get("error").asText());
+    }
+
+    @Test
+    void register_shouldReturnBadRequest_whenLoginAlreadyExistsIgnoringCase() throws Exception {
+        String duplicateLoginWithDifferentCase = duplicateLogin.toUpperCase(Locale.ROOT);
+
+        String requestBody = """
+                {
+                  "login": "%s",
+                  "password": "%s",
+                  "role": "USER",
+                  "email": "%s@test.com",
+                  "phone": "+37400112233"
+                }
+                """.formatted(duplicateLoginWithDifferentCase, PASSWORD, duplicateLogin);
 
         ResponseEntity<String> response = postRegisterJson(requestBody);
 
@@ -144,7 +195,7 @@ class RegisterApiITRefactorTest {
 
         JsonNode body = objectMapper.readTree(response.getBody());
         assertEquals("Admin already exists", body.get("error").asText());
-        assertFalse(userExistsByLogin(secondAdminLogin));
+        assertFalse(userExistsByLoginIgnoreCase(secondAdminLogin));
     }
 
     private ResponseEntity<String> postRegisterJson(String requestBody) {
@@ -155,15 +206,15 @@ class RegisterApiITRefactorTest {
         return restTemplate.postForEntity("/auth/register", entity, String.class);
     }
 
-    private boolean userExistsByLogin(String login) {
-        String sql = "SELECT COUNT(*) FROM users WHERE login = ?";
+    private boolean userExistsByLoginIgnoreCase(String login) {
+        String sql = "SELECT COUNT(*) FROM users WHERE LOWER(login) = LOWER(?)";
 
         try (Connection connection = ConnectionFactory.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setString(1, login);
 
-            try (var rs = statement.executeQuery()) {
+            try (ResultSet rs = statement.executeQuery()) {
                 rs.next();
                 return rs.getLong(1) > 0;
             }
@@ -172,8 +223,25 @@ class RegisterApiITRefactorTest {
         }
     }
 
+    private boolean userExistsByLoginExact(String login) {
+        String sql = "SELECT COUNT(*) FROM users WHERE login = ?";
+
+        try (Connection connection = ConnectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, login);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                rs.next();
+                return rs.getLong(1) > 0;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to check user existence by exact login", e);
+        }
+    }
+
     private void deleteUserByLogin(String login) {
-        String sql = "DELETE FROM users WHERE login = ?";
+        String sql = "DELETE FROM users WHERE LOWER(login) = LOWER(?)";
 
         try (Connection connection = ConnectionFactory.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {

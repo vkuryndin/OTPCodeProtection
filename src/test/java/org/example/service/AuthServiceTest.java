@@ -12,6 +12,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Locale;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -25,6 +27,8 @@ class AuthServiceTest {
     @Mock
     private PasswordHasher passwordHasher;
 
+    @Mock
+    private TokenService tokenService;
 
     @InjectMocks
     private AuthService authService;
@@ -59,6 +63,33 @@ class AuthServiceTest {
         assertEquals("123456789", savedUser.getTelegramChatId());
 
         verify(passwordHasher).hash("12345678");
+    }
+
+    @Test
+    void register_shouldNormalizeLoginToLowerCase_whenMixedCaseLoginIsProvided() {
+        RegisterRequest request = new RegisterRequest();
+        request.setLogin("User_One");
+        request.setPassword("12345678");
+        request.setRole(Role.USER);
+        request.setEmail("user_1@test.com");
+        request.setPhone("+37400112233");
+        request.setTelegramChatId("123456789");
+
+        when(userRepository.findByLogin("user_one")).thenReturn(null);
+        when(passwordHasher.hash("12345678")).thenReturn("hashed_password");
+        when(userRepository.createUser(any(User.class))).thenReturn(11L);
+
+        Long userId = authService.register(request);
+
+        assertEquals(11L, userId);
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).createUser(userCaptor.capture());
+
+        User savedUser = userCaptor.getValue();
+        assertEquals("user_one", savedUser.getLogin());
+        assertEquals("hashed_password", savedUser.getPasswordHash());
+        assertEquals(Role.USER, savedUser.getRole());
     }
 
     @Test
@@ -121,6 +152,44 @@ class AuthServiceTest {
 
         assertNotNull(result);
         assertEquals(5L, result.getId());
+        assertEquals("valid_user", result.getLogin());
+        assertEquals(Role.USER, result.getRole());
+    }
+
+    @Test
+    void authenticate_shouldReturnUser_whenLoginHasDifferentCase() {
+        User user = new User();
+        user.setId(7L);
+        user.setLogin("valid_user");
+        user.setPasswordHash("hashed_password");
+        user.setRole(Role.USER);
+
+        when(userRepository.findByLogin("valid_user")).thenReturn(user);
+        when(passwordHasher.matches("12345678", "hashed_password")).thenReturn(true);
+
+        User result = authService.authenticate("VALID_USER", "12345678");
+
+        assertNotNull(result);
+        assertEquals(7L, result.getId());
+        assertEquals("valid_user", result.getLogin());
+        assertEquals(Role.USER, result.getRole());
+    }
+
+    @Test
+    void authenticate_shouldTrimAndNormalizeLogin_whenLoginContainsSpacesAndDifferentCase() {
+        User user = new User();
+        user.setId(8L);
+        user.setLogin("valid_user");
+        user.setPasswordHash("hashed_password");
+        user.setRole(Role.USER);
+
+        when(userRepository.findByLogin("valid_user")).thenReturn(user);
+        when(passwordHasher.matches("12345678", "hashed_password")).thenReturn(true);
+
+        User result = authService.authenticate("  VaLiD_UsEr  ", "12345678");
+
+        assertNotNull(result);
+        assertEquals(8L, result.getId());
         assertEquals("valid_user", result.getLogin());
         assertEquals(Role.USER, result.getRole());
     }
