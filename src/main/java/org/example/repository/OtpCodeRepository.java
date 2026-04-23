@@ -195,7 +195,12 @@ public class OtpCodeRepository {
         try (PreparedStatement statement = connection.prepareStatement(GENERATE_LOCK_SQL)) {
             statement.setInt(1, Long.hashCode(userId));
             statement.setInt(2, operationId.hashCode());
-            statement.executeQuery();
+
+            try (ResultSet rs = statement.executeQuery()) {
+                if (!rs.next()) {
+                    throw new SQLException("Failed to acquire advisory transaction lock");
+                }
+            }
         }
     }
 

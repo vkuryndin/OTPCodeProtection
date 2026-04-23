@@ -19,7 +19,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class TokenService {
+public final class TokenService {
 
     private static final String CREDENTIAL_VERSION_CLAIM = "credv";
 
@@ -32,6 +32,13 @@ public class TokenService {
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.expiration-minutes}") long expirationMinutes
     ) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalArgumentException("jwt.secret must not be blank");
+        }
+        if (expirationMinutes <= 0) {
+            throw new IllegalArgumentException("jwt.expiration-minutes must be greater than 0");
+        }
+
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMinutes = expirationMinutes;
         this.credentialVersionSalt = secret;

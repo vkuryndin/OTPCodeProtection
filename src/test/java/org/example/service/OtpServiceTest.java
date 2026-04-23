@@ -20,8 +20,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Method;
 import java.time.LocalDateTime;
+
+import org.example.dto.OtpGenerationResponse;
+import org.example.dto.OtpValidationResponse;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -83,15 +85,15 @@ class OtpServiceTest {
         when(otpConfigRepository.getConfig()).thenReturn(config);
         when(otpCodeRepository.createOtpCodeReplacingActive(any(OtpCode.class))).thenReturn(100L);
 
-        Object response = otpService.generateOtp(userId, request);
+        OtpGenerationResponse response = otpService.generateOtp(userId, request);
 
-        assertEquals("OTP generated successfully", readProperty(response, "message"));
-        assertEquals(100L, readProperty(response, "otpId"));
-        assertEquals("payment-file-001", readProperty(response, "operationId"));
-        assertEquals(OtpStatus.ACTIVE, readProperty(response, "status"));
-        assertEquals(DeliveryChannel.FILE, readProperty(response, "deliveryChannel"));
-        assertEquals("otp-codes.txt", readProperty(response, "deliveryTarget"));
-        assertNotNull(readProperty(response, "expiresAt"));
+        assertEquals("OTP generated successfully", response.message());
+        assertEquals(100L, response.otpId());
+        assertEquals("payment-file-001", response.operationId());
+        assertEquals(OtpStatus.ACTIVE, response.status());
+        assertEquals(DeliveryChannel.FILE, response.deliveryChannel());
+        assertEquals("otp-codes.txt", response.deliveryTarget());
+        assertNotNull(response.expiresAt());
 
         ArgumentCaptor<OtpCode> otpCaptor = ArgumentCaptor.forClass(OtpCode.class);
         verify(otpCodeRepository).createOtpCodeReplacingActive(otpCaptor.capture());
@@ -183,11 +185,11 @@ class OtpServiceTest {
         when(otpConfigRepository.getConfig()).thenReturn(config);
         when(otpCodeRepository.createOtpCodeReplacingActive(any(OtpCode.class))).thenReturn(101L);
 
-        Object response = otpService.generateOtp(userId, request);
+        OtpGenerationResponse response = otpService.generateOtp(userId, request);
 
-        assertEquals("OTP generated successfully", readProperty(response, "message"));
-        assertEquals(DeliveryChannel.EMAIL, readProperty(response, "deliveryChannel"));
-        assertEquals("user_email@test.com", readProperty(response, "deliveryTarget"));
+        assertEquals("OTP generated successfully", response.message());
+        assertEquals(DeliveryChannel.EMAIL, response.deliveryChannel());
+        assertEquals("user_email@test.com", response.deliveryTarget());
 
         verify(generateOtpRateLimitService).validateAndRegisterAttempt(userId);
         verify(emailDeliveryService).sendOtpEmail(
@@ -389,12 +391,12 @@ class OtpServiceTest {
         when(otpCodeRepository.consumeActiveCode(userId, "payment-validate-001", "123456"))
                 .thenReturn(otpCode);
 
-        Object response = otpService.validateOtp(userId, request);
+        OtpValidationResponse response = otpService.validateOtp(userId, request);
 
-        assertEquals("OTP validated successfully", readProperty(response, "message"));
-        assertEquals(200L, readProperty(response, "otpId"));
-        assertEquals("payment-validate-001", readProperty(response, "operationId"));
-        assertEquals(OtpStatus.USED, readProperty(response, "status"));
+        assertEquals("OTP validated successfully", response.message());
+        assertEquals(200L, response.otpId());
+        assertEquals("payment-validate-001", response.operationId());
+        assertEquals(OtpStatus.USED, response.status());
 
         verify(otpCodeRepository).expireActiveCodes();
         verify(otpCodeRepository).consumeActiveCode(userId, "payment-validate-001", "123456");
@@ -482,8 +484,8 @@ class OtpServiceTest {
         );
         assertEquals("Invalid or expired OTP code", firstException.getMessage());
 
-        Object response = otpService.validateOtp(userId, correctRequest);
-        assertEquals("OTP validated successfully", readProperty(response, "message"));
+        OtpValidationResponse response = otpService.validateOtp(userId, correctRequest);
+        assertEquals("OTP validated successfully", response.message());
 
         IllegalArgumentException secondException = assertThrows(
                 IllegalArgumentException.class,
@@ -552,21 +554,4 @@ class OtpServiceTest {
         verifyNoInteractions(emailDeliveryService, telegramDeliveryService, smsDeliveryService);
     }
 
-    private Object readProperty(Object target, String propertyName) {
-        try {
-            String capitalized = Character.toUpperCase(propertyName.charAt(0)) + propertyName.substring(1);
-
-            try {
-                Method getter = target.getClass().getMethod("get" + capitalized);
-                return getter.invoke(target);
-            } catch (NoSuchMethodException ignored) {
-                Method accessor = target.getClass().getMethod(propertyName);
-                return accessor.invoke(target);
-            }
-        } catch (Exception e) {
-            fail("Failed to read property '" + propertyName + "' from "
-                    + target.getClass().getSimpleName() + ": " + e.getMessage());
-            return null;
-        }
-    }
 }
