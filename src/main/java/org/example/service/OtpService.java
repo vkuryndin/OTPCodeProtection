@@ -32,6 +32,10 @@ public class OtpService {
     private static final long VALIDATION_BLOCK_MINUTES = 5;
     private static final long VALIDATION_ATTEMPT_RETENTION_MINUTES = 30;
 
+    private static final int OPERATION_ID_MAX_LENGTH = 100;
+    private static final int DELIVERY_TARGET_MAX_LENGTH = 255;
+    private static final int OTP_CODE_MAX_LENGTH = 10;
+
     private final OtpConfigRepository otpConfigRepository;
     private final OtpCodeRepository otpCodeRepository;
     private final FileDeliveryService fileDeliveryService;
@@ -147,6 +151,12 @@ public class OtpService {
             throw new IllegalArgumentException("Operation ID is required");
         }
 
+        validateMaxLength(request.getOperationId(), OPERATION_ID_MAX_LENGTH, "Operation ID is too long");
+
+        if (request.getDeliveryTarget() != null) {
+            validateMaxLength(request.getDeliveryTarget(), DELIVERY_TARGET_MAX_LENGTH, "Delivery target is too long");
+        }
+
         if (request.getDeliveryChannel() == null) {
             log.warn("OTP generation failed: delivery channel is missing, userId={}, operationId={}",
                     userId, request.getOperationId());
@@ -165,11 +175,15 @@ public class OtpService {
             throw new IllegalArgumentException("Operation ID is required");
         }
 
+        validateMaxLength(request.getOperationId(), OPERATION_ID_MAX_LENGTH, "Operation ID is too long");
+
         if (request.getCode() == null || request.getCode().isBlank()) {
             log.warn("OTP validation failed: OTP code is missing, userId={}, operationId={}",
                     userId, request.getOperationId());
             throw new IllegalArgumentException("OTP code is required");
         }
+
+        validateMaxLength(request.getCode(), OTP_CODE_MAX_LENGTH, "OTP code is too long");
     }
 
     private User requireUser(Long userId) {
@@ -327,6 +341,12 @@ public class OtpService {
         };
     }
 
+    @Scheduled(fixedDelayString = "${otp.validation-attempt-cleanup.fixed-delay-ms:600000}")
+    public synchronized void cleanupStaleValidationAttempts() {
+        LocalDateTime now = LocalDateTime.now();
+        failedValidationAttempts.entrySet().removeIf(entry -> entry.getValue().shouldRemove(now));
+    }
+
     private synchronized void ensureValidationNotBlocked(Long userId, String operationId) {
         String key = validationAttemptKey(userId, operationId);
         ValidationAttemptState state = failedValidationAttempts.get(key);
@@ -370,7 +390,6 @@ public class OtpService {
 
         if (state.failedAttempts >= MAX_INVALID_VALIDATION_ATTEMPTS) {
             state.blockedUntil = now.plusMinutes(VALIDATION_BLOCK_MINUTES);
-
             log.warn("OTP validation temporarily blocked: userId={}, operationId={}, failedAttempts={}, blockedUntil={}",
                     userId, operationId, state.failedAttempts, state.blockedUntil);
         }
@@ -380,16 +399,9 @@ public class OtpService {
         failedValidationAttempts.remove(validationAttemptKey(userId, operationId));
     }
 
-    @Scheduled(fixedDelayString = "${otp.validation-attempt-cleanup.fixed-delay-ms:600000}")
-    public synchronized void cleanupStaleValidationAttempts() {
-        LocalDateTime now = LocalDateTime.now();
-        int before = failedValidationAttempts.size();
-
-        failedValidationAttempts.entrySet().removeIf(entry -> entry.getValue().shouldRemove(now));
-
-        int removed = before - failedValidationAttempts.size();
-        if (removed > 0) {
-            log.debug("Removed stale OTP validation attempt entries: removed={}", removed);
+    private void validateMaxLength(String value, int maxLength, String message) {
+        if (value != null && value.length() > maxLength) {
+            throw new IllegalArgumentException(message);
         }
     }
 

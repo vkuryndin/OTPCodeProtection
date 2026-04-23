@@ -10,8 +10,10 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Base64;
 import java.util.Date;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,21 +21,23 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class TokenService {
 
-    private final String secret;
+    private static final String CREDENTIAL_VERSION_CLAIM = "credv";
+
+    private final SecretKey secretKey;
     private final long expirationMinutes;
+    private final String credentialVersionSalt;
     private final Set<String> revokedTokens = ConcurrentHashMap.newKeySet();
 
-    private volatile SecretKey secretKey;
-
-    public TokenService(@Value("${jwt.secret}") String secret,
-                        @Value("${jwt.expiration-minutes}") long expirationMinutes) {
-        this.secret = secret;
+    public TokenService(
+            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.expiration-minutes}") long expirationMinutes
+    ) {
+        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMinutes = expirationMinutes;
+        this.credentialVersionSalt = secret;
     }
 
     public String generateToken(User user) {
-        validateExpirationMinutes();
-
         Instant now = Instant.now();
         Instant expiresAt = now.plus(expirationMinutes, ChronoUnit.MINUTES);
 
@@ -41,9 +45,10 @@ public class TokenService {
                 .subject(user.getId().toString())
                 .claim("login", user.getLogin())
                 .claim("role", user.getRole().name())
+                .claim(CREDENTIAL_VERSION_CLAIM, buildCredentialVersion(user))
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
-                .signWith(getSecretKey())
+                .signWith(secretKey)
                 .compact();
     }
 
@@ -57,16 +62,24 @@ public class TokenService {
         return claims.get("role", String.class);
     }
 
+    public boolean isTokenCurrentForUser(String token, User user) {
+        Claims claims = parseClaims(token);
+        String tokenCredentialVersion = claims.get(CREDENTIAL_VERSION_CLAIM, String.class);
+        return buildCredentialVersion(user).equals(tokenCredentialVersion);
+    }
+
     public void revokeToken(String token) {
         revokedTokens.add(token);
     }
 
     private Claims parseClaims(String token) {
-        ensureTokenNotRevoked(token);
+        if (revokedTokens.contains(token)) {
+            throw new UnauthorizedException("Invalid or expired token");
+        }
 
         try {
             return Jwts.parser()
-                    .verifyWith(getSecretKey())
+                    .verifyWith(secretKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
@@ -75,35 +88,22 @@ public class TokenService {
         }
     }
 
-    private void ensureTokenNotRevoked(String token) {
-        if (revokedTokens.contains(token)) {
-            throw new UnauthorizedException("Invalid or expired token");
-        }
+    private String buildCredentialVersion(User user) {
+        return buildCredentialVersion(user.getPasswordHash());
     }
 
-    private SecretKey getSecretKey() {
-        SecretKey localKey = secretKey;
+    private String buildCredentialVersion(String passwordHash) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] raw = (credentialVersionSalt + ":" + passwordHash).getBytes(StandardCharsets.UTF_8);
+            byte[] hash = digest.digest(raw);
 
-        if (localKey == null) {
-            synchronized (this) {
-                localKey = secretKey;
-                if (localKey == null) {
-                    try {
-                        localKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-                        secretKey = localKey;
-                    } catch (Exception e) {
-                        throw new IllegalStateException("JWT secret is invalid", e);
-                    }
-                }
-            }
-        }
+            byte[] shortHash = new byte[16];
+            System.arraycopy(hash, 0, shortHash, 0, shortHash.length);
 
-        return localKey;
-    }
-
-    private void validateExpirationMinutes() {
-        if (expirationMinutes <= 0) {
-            throw new IllegalStateException("JWT expiration must be greater than 0");
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(shortHash);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to build credential version", e);
         }
     }
 }

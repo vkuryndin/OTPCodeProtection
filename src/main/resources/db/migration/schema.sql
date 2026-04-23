@@ -79,3 +79,4 @@ CREATE INDEX idx_otp_codes_expires_at
 CREATE INDEX idx_otp_codes_user_operation
     ON otp_codes (user_id, operation_id);
 
+CREATE INDEX idx_otp_codes_status_expires_at ON otp_codes (status, expires_at);

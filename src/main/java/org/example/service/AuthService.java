@@ -15,30 +15,45 @@ public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
+    private static final int LOGIN_MAX_LENGTH = 100;
+    private static final int PASSWORD_MAX_LENGTH = 255;
+    private static final int EMAIL_MAX_LENGTH = 255;
+    private static final int PHONE_MAX_LENGTH = 30;
+    private static final int TELEGRAM_CHAT_ID_MAX_LENGTH = 100;
+
     private final UserRepository userRepository;
     private final PasswordHasher passwordHasher;
+    private final TokenService tokenService;
 
     public AuthService(UserRepository userRepository,
-                       PasswordHasher passwordHasher) {
+                       PasswordHasher passwordHasher,
+                       TokenService tokenService) {
         this.userRepository = userRepository;
         this.passwordHasher = passwordHasher;
+        this.tokenService = tokenService;
     }
 
     public Long register(RegisterRequest request) {
         validateRegisterRequest(request);
 
         String normalizedLogin = request.getLogin().trim();
-        Role role = request.getRole();
 
         if (userRepository.findByLogin(normalizedLogin) != null) {
             throw new IllegalArgumentException("User with this login already exists");
         }
 
-        if (role == Role.ADMIN && userRepository.adminExists()) {
+        if (request.getRole() == Role.ADMIN && userRepository.adminExists()) {
             throw new IllegalStateException("Admin already exists");
         }
 
-        User user = buildUserForRegistration(request, normalizedLogin);
+        User user = new User();
+        user.setLogin(normalizedLogin);
+        user.setPasswordHash(passwordHasher.hash(request.getPassword()));
+        user.setRole(request.getRole());
+        user.setEmail(emptyToNull(request.getEmail()));
+        user.setPhone(emptyToNull(request.getPhone()));
+        user.setTelegramChatId(emptyToNull(request.getTelegramChatId()));
+
         Long userId = userRepository.createUser(user);
 
         log.info("User registered successfully: userId={}, login={}, role={}",
@@ -47,14 +62,24 @@ public class AuthService {
         return userId;
     }
 
-    public User login(String login, String password) {
-        return authenticate(login, password);
-    }
-
     public User authenticate(String login, String password) {
-        String normalizedLogin = validateCredentialsForAuthentication(login, password);
+        String loginError = AuthValidationUtil.validateLogin(login);
+        if (loginError != null) {
+            log.warn("Authentication failed: invalid login format, login={}", login);
+            throw new IllegalArgumentException(loginError);
+        }
 
+        String passwordError = AuthValidationUtil.validatePassword(password);
+        if (passwordError != null) {
+            log.warn("Authentication failed: invalid password format, login={}", login);
+            throw new IllegalArgumentException(passwordError);
+        }
+
+        validateLoginFieldLengths(login, password);
+
+        String normalizedLogin = login.trim();
         User user = userRepository.findByLogin(normalizedLogin);
+
         if (user == null) {
             log.warn("Authentication failed: user not found, login={}", normalizedLogin);
             throw new IllegalArgumentException("Invalid login or password");
@@ -70,6 +95,15 @@ public class AuthService {
                 user.getId(), user.getLogin(), user.getRole());
 
         return user;
+    }
+
+    public String loginAndGenerateToken(String login, String password) {
+        User user = authenticate(login, password);
+        String token = tokenService.generateToken(user);
+
+        log.info("JWT token issued: userId={}, login={}", user.getId(), user.getLogin());
+
+        return token;
     }
 
     private void validateRegisterRequest(RegisterRequest request) {
@@ -90,33 +124,27 @@ public class AuthService {
         if (request.getRole() == null) {
             throw new IllegalArgumentException("Role is required");
         }
+
+        validateRegisterFieldLengths(request);
     }
 
-    private String validateCredentialsForAuthentication(String login, String password) {
-        String loginError = AuthValidationUtil.validateLogin(login);
-        if (loginError != null) {
-            log.warn("Authentication failed: invalid login format, login={}", login);
-            throw new IllegalArgumentException(loginError);
-        }
-
-        String passwordError = AuthValidationUtil.validatePassword(password);
-        if (passwordError != null) {
-            log.warn("Authentication failed: invalid password format, login={}", login);
-            throw new IllegalArgumentException(passwordError);
-        }
-
-        return login.trim();
+    private void validateRegisterFieldLengths(RegisterRequest request) {
+        validateMaxLength(request.getLogin(), LOGIN_MAX_LENGTH, "Login is too long");
+        validateMaxLength(request.getPassword(), PASSWORD_MAX_LENGTH, "Password is too long");
+        validateMaxLength(request.getEmail(), EMAIL_MAX_LENGTH, "Email is too long");
+        validateMaxLength(request.getPhone(), PHONE_MAX_LENGTH, "Phone is too long");
+        validateMaxLength(request.getTelegramChatId(), TELEGRAM_CHAT_ID_MAX_LENGTH, "Telegram chat id is too long");
     }
 
-    private User buildUserForRegistration(RegisterRequest request, String normalizedLogin) {
-        User user = new User();
-        user.setLogin(normalizedLogin);
-        user.setPasswordHash(passwordHasher.hash(request.getPassword()));
-        user.setRole(request.getRole());
-        user.setEmail(emptyToNull(request.getEmail()));
-        user.setPhone(emptyToNull(request.getPhone()));
-        user.setTelegramChatId(emptyToNull(request.getTelegramChatId()));
-        return user;
+    private void validateLoginFieldLengths(String login, String password) {
+        validateMaxLength(login, LOGIN_MAX_LENGTH, "Login is too long");
+        validateMaxLength(password, PASSWORD_MAX_LENGTH, "Password is too long");
+    }
+
+    private void validateMaxLength(String value, int maxLength, String message) {
+        if (value != null && value.length() > maxLength) {
+            throw new IllegalArgumentException(message);
+        }
     }
 
     private String emptyToNull(String value) {
