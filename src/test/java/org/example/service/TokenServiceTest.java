@@ -99,7 +99,7 @@ class TokenServiceTest {
         List<LoggedInUserResponse> users = tokenService.getLoggedInUsers();
 
         assertEquals(1, users.size());
-        assertEquals("user1", users.get(0).getLogin());
+        assertEquals("user1", users.get(0).login());
 
         verify(userSessionRepository).cleanupExpiredSessions();
         verify(userSessionRepository).findLoggedInUsers();
