@@ -11,8 +11,6 @@ public class LoggedInUserResponse {
     private LocalDateTime loggedInAt;
     private LocalDateTime expiresAt;
 
-    public LoggedInUserResponse() {
-    }
 
     public LoggedInUserResponse(Long userId, String login, Role role,
                                 LocalDateTime loggedInAt, LocalDateTime expiresAt) {
@@ -45,14 +43,6 @@ public class LoggedInUserResponse {
 
     public void setRole(Role role) {
         this.role = role;
-    }
-
-    public LocalDateTime getLoggedInAt() {
-        return loggedInAt;
-    }
-
-    public void setLoggedInAt(LocalDateTime loggedInAt) {
-        this.loggedInAt = loggedInAt;
     }
 
     public LocalDateTime getExpiresAt() {
