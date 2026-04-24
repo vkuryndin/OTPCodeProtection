@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.example.dto.LoggedInUserResponse;
+import org.example.service.TokenService;
+
 @RestController
 @RequestMapping("/admin")
 public class AdminController {
@@ -32,13 +35,16 @@ public class AdminController {
     private final UserRepository userRepository;
     private final OtpConfigRepository otpConfigRepository;
     private final RequestAuthService requestAuthService;
+    private final TokenService tokenService;
 
     public AdminController(UserRepository userRepository,
                            OtpConfigRepository otpConfigRepository,
-                           RequestAuthService requestAuthService) {
+                           RequestAuthService requestAuthService,
+                           TokenService tokenService) {
         this.userRepository = userRepository;
         this.otpConfigRepository = otpConfigRepository;
         this.requestAuthService = requestAuthService;
+        this.tokenService = tokenService;
     }
 
     @GetMapping("/users")
@@ -123,6 +129,16 @@ public class AdminController {
         );
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/logged-in-users")
+    public ResponseEntity<List<LoggedInUserResponse>> getLoggedInUsers(HttpServletRequest request) {
+        Long adminId = requestAuthService.requireAdminUserId(request);
+
+        List<LoggedInUserResponse> users = tokenService.getLoggedInUsers();
+
+        log.info("Admin fetched logged-in users: adminId={}, returnedUsers={}", adminId, users.size());
+        return ResponseEntity.ok(users);
     }
 
     private User requireExistingUserForDelete(Long adminId, Long targetUserId) {

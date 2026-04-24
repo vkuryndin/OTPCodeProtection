@@ -1,22 +1,30 @@
 package org.example.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.example.dto.ValidateOtpRequest;
 import org.example.integration.support.TestRequests;
 import org.example.model.User;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class OtpApiITRefactorTest extends BaseIntegrationTest {
@@ -47,211 +55,217 @@ class OtpApiITRefactorTest extends BaseIntegrationTest {
         resetOtpConfig();
     }
 
-    @Test
-    void generateOtpToFile_shouldReturnCreated_andWriteCodeToFile() throws Exception {
-        String token = loginAndGetToken(testLogin);
+    @Nested
+    class GenerateOtp {
 
-        ResponseEntity<String> response = postAuthorized(
-                "/otp/generate",
-                token,
-                TestRequests.generateFileOtp("payment-file-001", otpFile.toString())
-        );
+        @Test
+        void shouldReturnCreatedAndWriteCodeToFile() throws Exception {
+            String token = loginAndGetToken(testLogin);
 
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("OTP generated successfully", body.get("message").asText());
-        assertEquals("payment-file-001", body.get("operationId").asText());
-        assertEquals("ACTIVE", body.get("status").asText());
-        assertEquals("FILE", body.get("deliveryChannel").asText());
-        assertTrue(body.has("otpId"));
-
-        assertTrue(Files.exists(otpFile));
-        String code = readLastCodeFromFile(otpFile);
-        assertEquals(DEFAULT_CODE_LENGTH, code.length());
-    }
-
-    @Test
-    void validateOtp_shouldReturnUsed_whenCodeIsValid() throws Exception {
-        String token = loginAndGetToken(testLogin);
-        String operationId = "payment-file-valid-001";
-        String code = generateOtpAndReadCode(token, operationId);
-
-        ResponseEntity<String> response = postAuthorized(
-                "/otp/validate",
-                token,
-                TestRequests.validateOtp(operationId, code)
-        );
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("OTP validated successfully", body.get("message").asText());
-        assertEquals(operationId, body.get("operationId").asText());
-        assertEquals("USED", body.get("status").asText());
-    }
-
-    @Test
-    void validateOtp_shouldReturnBadRequest_whenCodeIsWrong() throws Exception {
-        String token = loginAndGetToken(testLogin);
-        String operationId = "payment-file-wrong-001";
-
-        generateOtpAndReadCode(token, operationId);
-
-        ResponseEntity<String> response = postAuthorized(
-                "/otp/validate",
-                token,
-                TestRequests.validateOtp(operationId, "000000")
-        );
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("Invalid or expired OTP code", body.get("error").asText());
-    }
-
-    @Test
-    void validateOtp_shouldReturnBadRequest_whenCodeIsAlreadyUsed() throws Exception {
-        String token = loginAndGetToken(testLogin);
-        String operationId = "payment-file-used-001";
-        String code = generateOtpAndReadCode(token, operationId);
-
-        ResponseEntity<String> firstResponse = postAuthorized(
-                "/otp/validate",
-                token,
-                TestRequests.validateOtp(operationId, code)
-        );
-        assertEquals(HttpStatus.OK, firstResponse.getStatusCode());
-
-        ResponseEntity<String> secondResponse = postAuthorized(
-                "/otp/validate",
-                token,
-                TestRequests.validateOtp(operationId, code)
-        );
-        assertEquals(HttpStatus.BAD_REQUEST, secondResponse.getStatusCode());
-
-        JsonNode body = objectMapper.readTree(secondResponse.getBody());
-        assertEquals("Invalid or expired OTP code", body.get("error").asText());
-    }
-
-    @Test
-    void validateOtp_shouldReturnBadRequest_whenCodeIsExpired() throws Exception {
-        setOtpConfig(DEFAULT_CODE_LENGTH, 1);
-
-        String token = loginAndGetToken(testLogin);
-        String operationId = "payment-file-expired-001";
-        String code = generateOtpAndReadCode(token, operationId);
-
-        Thread.sleep(1500);
-
-        ResponseEntity<String> response = postAuthorized(
-                "/otp/validate",
-                token,
-                TestRequests.validateOtp(operationId, code)
-        );
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("Invalid or expired OTP code", body.get("error").asText());
-    }
-
-    @Test
-    void generateOtp_shouldExpirePreviousActiveCode_whenSameOperationIdIsUsedAgain() throws Exception {
-        setOtpConfig(10, 300);
-
-        String token = loginAndGetToken(testLogin);
-        String operationId = "payment-file-repeat-001";
-
-        String firstCode = generateOtpAndReadCode(token, operationId);
-        String secondCode = generateOtpAndReadCode(token, operationId);
-
-        assertNotEquals(firstCode, secondCode);
-        assertEquals(1, countOtpCodesByStatus(testUserId, operationId, "ACTIVE"));
-        assertEquals(1, countOtpCodesByStatus(testUserId, operationId, "EXPIRED"));
-
-        ResponseEntity<String> firstValidation = postAuthorized(
-                "/otp/validate",
-                token,
-                TestRequests.validateOtp(operationId, firstCode)
-        );
-        assertEquals(HttpStatus.BAD_REQUEST, firstValidation.getStatusCode());
-
-        JsonNode firstBody = objectMapper.readTree(firstValidation.getBody());
-        assertEquals("Invalid or expired OTP code", firstBody.get("error").asText());
-
-        ResponseEntity<String> secondValidation = postAuthorized(
-                "/otp/validate",
-                token,
-                TestRequests.validateOtp(operationId, secondCode)
-        );
-        assertEquals(HttpStatus.OK, secondValidation.getStatusCode());
-
-        JsonNode secondBody = objectMapper.readTree(secondValidation.getBody());
-        assertEquals("OTP validated successfully", secondBody.get("message").asText());
-    }
-
-    @Test
-    void validateOldOtpAndGenerateNewOtpConcurrently_shouldKeepConsistentState() throws Exception {
-        String token = loginAndGetToken(testLogin);
-        String operationId = "payment-file-generate-validate-race-001";
-
-        String oldCode = generateOtpAndReadCode(token, operationId);
-
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        CountDownLatch startLatch = new CountDownLatch(1);
-
-        // Start both requests at nearly the same moment to simulate a race
-        // between validating the previous OTP and generating a replacement OTP.
-        Callable<ResponseEntity<String>> generateTask = () -> {
-            startLatch.await(5, TimeUnit.SECONDS);
-            return postAuthorized(
+            ResponseEntity<String> response = postAuthorized(
                     "/otp/generate",
                     token,
-                    TestRequests.generateFileOtp(operationId, otpFile.toString())
+                    TestRequests.generateFileOtp("payment-file-001", otpFile.toString())
             );
-        };
 
-        Callable<ResponseEntity<String>> validateTask = () -> {
-            startLatch.await(5, TimeUnit.SECONDS);
-            return postAuthorized(
+            assertEquals(HttpStatus.CREATED, response.getStatusCode());
+
+            JsonNode body = objectMapper.readTree(response.getBody());
+            assertEquals("OTP generated successfully", body.get("message").asText());
+            assertEquals("payment-file-001", body.get("operationId").asText());
+            assertEquals("ACTIVE", body.get("status").asText());
+            assertEquals("FILE", body.get("deliveryChannel").asText());
+            assertTrue(body.has("otpId"));
+
+            assertTrue(Files.exists(otpFile));
+            String code = readLastCodeFromFile(otpFile);
+            assertEquals(DEFAULT_CODE_LENGTH, code.length());
+        }
+
+        @Test
+        void shouldExpirePreviousActiveCode_whenSameOperationIdIsUsedAgain() throws Exception {
+            setOtpConfig(10, 300);
+
+            String token = loginAndGetToken(testLogin);
+            String operationId = "payment-file-repeat-001";
+
+            String firstCode = generateOtpAndReadCode(token, operationId);
+            String secondCode = generateOtpAndReadCode(token, operationId);
+
+            assertNotEquals(firstCode, secondCode);
+            assertEquals(1, countOtpCodesByStatus(testUserId, operationId, "ACTIVE"));
+            assertEquals(1, countOtpCodesByStatus(testUserId, operationId, "EXPIRED"));
+
+            ResponseEntity<String> firstValidation = postAuthorized(
                     "/otp/validate",
                     token,
-                    TestRequests.validateOtp(operationId, oldCode)
+                    TestRequests.validateOtp(operationId, firstCode)
             );
-        };
+            assertEquals(HttpStatus.BAD_REQUEST, firstValidation.getStatusCode());
 
-        Future<ResponseEntity<String>> generateFuture = executor.submit(generateTask);
-        Future<ResponseEntity<String>> validateFuture = executor.submit(validateTask);
+            JsonNode firstBody = objectMapper.readTree(firstValidation.getBody());
+            assertEquals("Invalid or expired OTP code", firstBody.get("error").asText());
 
-        startLatch.countDown();
+            ResponseEntity<String> secondValidation = postAuthorized(
+                    "/otp/validate",
+                    token,
+                    TestRequests.validateOtp(operationId, secondCode)
+            );
+            assertEquals(HttpStatus.OK, secondValidation.getStatusCode());
 
-        ResponseEntity<String> generateResponse = generateFuture.get(10, TimeUnit.SECONDS);
-        ResponseEntity<String> validateResponse = validateFuture.get(10, TimeUnit.SECONDS);
+            JsonNode secondBody = objectMapper.readTree(secondValidation.getBody());
+            assertEquals("OTP validated successfully", secondBody.get("message").asText());
+        }
+    }
 
-        executor.shutdownNow();
+    @Nested
+    class ValidateOtp {
 
-        assertEquals(HttpStatus.CREATED, generateResponse.getStatusCode());
+        @Test
+        void shouldReturnUsed_whenCodeIsValid() throws Exception {
+            String token = loginAndGetToken(testLogin);
+            String operationId = "payment-file-valid-001";
+            String code = generateOtpAndReadCode(token, operationId);
 
-        if (validateResponse.getStatusCode() == HttpStatus.OK) {
-            JsonNode body = objectMapper.readTree(validateResponse.getBody());
+            ResponseEntity<String> response = postAuthorized(
+                    "/otp/validate",
+                    token,
+                    TestRequests.validateOtp(operationId, code)
+            );
+
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+
+            JsonNode body = objectMapper.readTree(response.getBody());
             assertEquals("OTP validated successfully", body.get("message").asText());
-        } else {
-            assertEquals(HttpStatus.BAD_REQUEST, validateResponse.getStatusCode());
-            JsonNode body = objectMapper.readTree(validateResponse.getBody());
+            assertEquals(operationId, body.get("operationId").asText());
+            assertEquals("USED", body.get("status").asText());
+        }
+
+        @Test
+        void shouldReturnBadRequest_whenCodeIsWrong() throws Exception {
+            String token = loginAndGetToken(testLogin);
+            String operationId = "payment-file-wrong-001";
+
+            generateOtpAndReadCode(token, operationId);
+
+            ResponseEntity<String> response = postAuthorized(
+                    "/otp/validate",
+                    token,
+                    TestRequests.validateOtp(operationId, "000000")
+            );
+
+            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+
+            JsonNode body = objectMapper.readTree(response.getBody());
             assertEquals("Invalid or expired OTP code", body.get("error").asText());
         }
 
-        assertEquals(1, countOtpCodesByStatus(testUserId, operationId, "ACTIVE"));
-        assertEquals(
-                1,
-                countOtpCodesByStatus(testUserId, operationId, "USED")
-                        + countOtpCodesByStatus(testUserId, operationId, "EXPIRED")
-        );
+        @Test
+        void shouldReturnBadRequest_whenCodeIsAlreadyUsed() throws Exception {
+            String token = loginAndGetToken(testLogin);
+            String operationId = "payment-file-used-001";
+            String code = generateOtpAndReadCode(token, operationId);
+
+            ResponseEntity<String> firstResponse = postAuthorized(
+                    "/otp/validate",
+                    token,
+                    TestRequests.validateOtp(operationId, code)
+            );
+            assertEquals(HttpStatus.OK, firstResponse.getStatusCode());
+
+            ResponseEntity<String> secondResponse = postAuthorized(
+                    "/otp/validate",
+                    token,
+                    TestRequests.validateOtp(operationId, code)
+            );
+            assertEquals(HttpStatus.BAD_REQUEST, secondResponse.getStatusCode());
+
+            JsonNode body = objectMapper.readTree(secondResponse.getBody());
+            assertEquals("Invalid or expired OTP code", body.get("error").asText());
+        }
+
+        @Test
+        void shouldReturnBadRequest_whenCodeIsExpired() throws Exception {
+            setOtpConfig(DEFAULT_CODE_LENGTH, 1);
+
+            String token = loginAndGetToken(testLogin);
+            String operationId = "payment-file-expired-001";
+            String code = generateOtpAndReadCode(token, operationId);
+
+            Thread.sleep(1500);
+
+            ResponseEntity<String> response = postAuthorized(
+                    "/otp/validate",
+                    token,
+                    TestRequests.validateOtp(operationId, code)
+            );
+
+            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+
+            JsonNode body = objectMapper.readTree(response.getBody());
+            assertEquals("Invalid or expired OTP code", body.get("error").asText());
+        }
+    }
+
+    @Nested
+    class Concurrency {
+
+        @Test
+        void shouldKeepConsistentState_whenOldOtpIsValidatedAndNewOneIsGeneratedConcurrently() throws Exception {
+            String token = loginAndGetToken(testLogin);
+            String operationId = "payment-file-generate-validate-race-001";
+
+            String oldCode = generateOtpAndReadCode(token, operationId);
+
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+            CountDownLatch startLatch = new CountDownLatch(1);
+
+            Callable<ResponseEntity<String>> generateTask = () -> {
+                startLatch.await(5, TimeUnit.SECONDS);
+                return postAuthorized(
+                        "/otp/generate",
+                        token,
+                        TestRequests.generateFileOtp(operationId, otpFile.toString())
+                );
+            };
+
+            Callable<ResponseEntity<String>> validateTask = () -> {
+                startLatch.await(5, TimeUnit.SECONDS);
+                return postAuthorized(
+                        "/otp/validate",
+                        token,
+                        TestRequests.validateOtp(operationId, oldCode)
+                );
+            };
+
+            Future<ResponseEntity<String>> generateFuture = executor.submit(generateTask);
+            Future<ResponseEntity<String>> validateFuture = executor.submit(validateTask);
+
+            startLatch.countDown();
+
+            ResponseEntity<String> generateResponse = generateFuture.get(10, TimeUnit.SECONDS);
+            ResponseEntity<String> validateResponse = validateFuture.get(10, TimeUnit.SECONDS);
+
+            executor.shutdownNow();
+
+            assertEquals(HttpStatus.CREATED, generateResponse.getStatusCode());
+
+            if (validateResponse.getStatusCode() == HttpStatus.OK) {
+                JsonNode body = objectMapper.readTree(validateResponse.getBody());
+                assertEquals("OTP validated successfully", body.get("message").asText());
+            } else {
+                assertEquals(HttpStatus.BAD_REQUEST, validateResponse.getStatusCode());
+                JsonNode body = objectMapper.readTree(validateResponse.getBody());
+                assertEquals("Invalid or expired OTP code", body.get("error").asText());
+            }
+
+            assertEquals(1, countOtpCodesByStatus(testUserId, operationId, "ACTIVE"));
+            assertEquals(
+                    1,
+                    countOtpCodesByStatus(testUserId, operationId, "USED")
+                            + countOtpCodesByStatus(testUserId, operationId, "EXPIRED")
+            );
+        }
     }
 
     private String generateOtpAndReadCode(String token, String operationId) throws Exception {

@@ -1,17 +1,20 @@
 package org.example.integration;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import org.example.integration.support.TestHttpAssertions;
 import org.example.model.User;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.*;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import java.util.stream.Stream;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class OtpConfigValidationApiITTest extends BaseIntegrationTest {
@@ -43,154 +46,119 @@ class OtpConfigValidationApiITTest extends BaseIntegrationTest {
         resetOtpConfig();
     }
 
-    @Test
-    void updateOtpConfig_shouldReturnBadRequest_whenCodeLengthIsTooSmall() throws Exception {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidOtpConfigRequests")
+    void updateOtpConfig_shouldRejectInvalidInput(String caseName,
+                                                  String requestBody,
+                                                  String expectedError) throws Exception {
         String adminToken = loginAndGetToken(adminLogin);
 
-        String requestBody = """
-                {
-                  "codeLength": 3,
-                  "ttlSeconds": 300
-                }
-                """;
+        ResponseEntity<String> response =
+                exchangeAuthorized("/admin/otp-config", HttpMethod.PUT, adminToken, requestBody);
 
-        ResponseEntity<String> response = putAuthorizedOtpConfig(adminToken, requestBody);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("Code length must be between 4 and 10", body.get("error").asText());
-    }
-
-    @Test
-    void updateOtpConfig_shouldReturnBadRequest_whenCodeLengthIsTooLarge() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin);
-
-        String requestBody = """
-                {
-                  "codeLength": 11,
-                  "ttlSeconds": 300
-                }
-                """;
-
-        ResponseEntity<String> response = putAuthorizedOtpConfig(adminToken, requestBody);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("Code length must be between 4 and 10", body.get("error").asText());
-    }
-
-    @Test
-    void updateOtpConfig_shouldReturnBadRequest_whenTtlIsZero() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin);
-
-        String requestBody = """
-                {
-                  "codeLength": 6,
-                  "ttlSeconds": 0
-                }
-                """;
-
-        ResponseEntity<String> response = putAuthorizedOtpConfig(adminToken, requestBody);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("TTL seconds must be greater than 0", body.get("error").asText());
-    }
-
-    @Test
-    void updateOtpConfig_shouldReturnBadRequest_whenCodeLengthIsMissing() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin);
-
-        String requestBody = """
-                {
-                  "ttlSeconds": 300
-                }
-                """;
-
-        ResponseEntity<String> response = putAuthorizedOtpConfig(adminToken, requestBody);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("Code length is required", body.get("error").asText());
-    }
-
-    @Test
-    void updateOtpConfig_shouldReturnBadRequest_whenTtlIsMissing() throws Exception {
-        String adminToken = loginAndGetToken(adminLogin);
-
-        String requestBody = """
-                {
-                  "codeLength": 6
-                }
-                """;
-
-        ResponseEntity<String> response = putAuthorizedOtpConfig(adminToken, requestBody);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("TTL seconds is required", body.get("error").asText());
+        TestHttpAssertions.assertError(response, HttpStatus.BAD_REQUEST, expectedError, objectMapper);
     }
 
     @Test
     void updateOtpConfig_shouldReturnUnauthorized_whenTokenIsMissing() throws Exception {
-        String requestBody = """
-                {
-                  "codeLength": 6,
-                  "ttlSeconds": 300
-                }
-                """;
+        ResponseEntity<String> response =
+                restTemplate.exchange(
+                        "/admin/otp-config",
+                        HttpMethod.PUT,
+                        jsonEntity("""
+                                {
+                                  "codeLength": 6,
+                                  "ttlSeconds": 300
+                                }
+                                """),
+                        String.class
+                );
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
-
-        ResponseEntity<String> response = restTemplate.exchange(
-                "/admin/otp-config",
-                HttpMethod.PUT,
-                entity,
-                String.class
+        TestHttpAssertions.assertError(
+                response,
+                HttpStatus.UNAUTHORIZED,
+                "Authorization header is required",
+                objectMapper
         );
-
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("Authorization header is required", body.get("error").asText());
     }
 
     @Test
     void updateOtpConfig_shouldReturnForbidden_forUser() throws Exception {
         String userToken = loginAndGetToken(userLogin);
 
-        String requestBody = """
-                {
-                  "codeLength": 6,
-                  "ttlSeconds": 300
-                }
-                """;
+        ResponseEntity<String> response =
+                exchangeAuthorized(
+                        "/admin/otp-config",
+                        HttpMethod.PUT,
+                        userToken,
+                        """
+                        {
+                          "codeLength": 6,
+                          "ttlSeconds": 300
+                        }
+                        """
+                );
 
-        ResponseEntity<String> response = putAuthorizedOtpConfig(userToken, requestBody);
-
-        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-        assertNotNull(response.getBody());
-
-        JsonNode body = objectMapper.readTree(response.getBody());
-        assertEquals("Access denied", body.get("error").asText());
+        TestHttpAssertions.assertError(response, HttpStatus.FORBIDDEN, "Access denied", objectMapper);
     }
 
-    private ResponseEntity<String> putAuthorizedOtpConfig(String token, String requestBody) {
-        return exchangeAuthorized("/admin/otp-config", HttpMethod.PUT, token, requestBody);
+    private static Stream<Arguments> invalidOtpConfigRequests() {
+        return Stream.of(
+                Arguments.of(
+                        "code length too small",
+                        """
+                        {
+                          "codeLength": 3,
+                          "ttlSeconds": 300
+                        }
+                        """,
+                        "Code length must be between 4 and 10"
+                ),
+                Arguments.of(
+                        "code length too large",
+                        """
+                        {
+                          "codeLength": 11,
+                          "ttlSeconds": 300
+                        }
+                        """,
+                        "Code length must be between 4 and 10"
+                ),
+                Arguments.of(
+                        "ttl is zero",
+                        """
+                        {
+                          "codeLength": 6,
+                          "ttlSeconds": 0
+                        }
+                        """,
+                        "TTL seconds must be greater than 0"
+                ),
+                Arguments.of(
+                        "code length missing",
+                        """
+                        {
+                          "ttlSeconds": 300
+                        }
+                        """,
+                        "Code length is required"
+                ),
+                Arguments.of(
+                        "ttl missing",
+                        """
+                        {
+                          "codeLength": 6
+                        }
+                        """,
+                        "TTL seconds is required"
+                )
+        );
+    }
+
+    private org.springframework.http.HttpEntity<String> jsonEntity(String body) {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        return new org.springframework.http.HttpEntity<>(body, headers);
     }
 
     private String shortId() {

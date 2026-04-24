@@ -15,6 +15,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.example.dto.LoggedInUserResponse;
+import org.example.service.TokenService;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -45,6 +48,9 @@ class AdminControllerTest {
 
     @MockitoBean
     private RequestAuthService requestAuthService;
+
+    @MockitoBean
+    private TokenService tokenService;
 
     @Test
     void getUsers_shouldReturnOk_whenAdminIsAuthorized() throws Exception {
@@ -155,5 +161,24 @@ class AdminControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Code length must be between 4 and 10"));
+    }
+    @Test
+    void getLoggedInUsers_shouldReturnOk_whenAdminIsAuthorized() throws Exception {
+        LoggedInUserResponse user = new LoggedInUserResponse(
+                2L,
+                "user1",
+                Role.USER,
+                LocalDateTime.of(2026, 4, 23, 10, 0),
+                LocalDateTime.of(2026, 4, 23, 11, 0)
+        );
+
+        when(requestAuthService.requireAdminUserId(any())).thenReturn(1L);
+        when(tokenService.getLoggedInUsers()).thenReturn(List.of(user));
+
+        mockMvc.perform(get("/admin/logged-in-users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].userId").value(2))
+                .andExpect(jsonPath("$[0].login").value("user1"))
+                .andExpect(jsonPath("$[0].role").value("USER"));
     }
 }

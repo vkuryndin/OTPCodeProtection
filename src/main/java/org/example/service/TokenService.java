@@ -3,8 +3,10 @@ package org.example.service;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.example.dto.LoggedInUserResponse;
 import org.example.exception.UnauthorizedException;
 import org.example.model.User;
+import org.example.repository.UserSessionRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -12,11 +14,13 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.time.LocalDateTime;
+
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Date;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 public final class TokenService {
@@ -26,29 +30,26 @@ public final class TokenService {
     private final SecretKey secretKey;
     private final long expirationMinutes;
     private final String credentialVersionSalt;
-    private final Set<String> revokedTokens = ConcurrentHashMap.newKeySet();
+    private final UserSessionRepository userSessionRepository;
 
     public TokenService(
             @Value("${jwt.secret}") String secret,
-            @Value("${jwt.expiration-minutes}") long expirationMinutes
+            @Value("${jwt.expiration-minutes}") long expirationMinutes,
+            UserSessionRepository userSessionRepository
     ) {
-        if (secret == null || secret.isBlank()) {
-            throw new IllegalArgumentException("jwt.secret must not be blank");
-        }
-        if (expirationMinutes <= 0) {
-            throw new IllegalArgumentException("jwt.expiration-minutes must be greater than 0");
-        }
-
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMinutes = expirationMinutes;
         this.credentialVersionSalt = secret;
+        this.userSessionRepository = userSessionRepository;
     }
 
     public String generateToken(User user) {
         Instant now = Instant.now();
         Instant expiresAt = now.plus(expirationMinutes, ChronoUnit.MINUTES);
+        String tokenId = UUID.randomUUID().toString();
 
-        return Jwts.builder()
+        String token = Jwts.builder()
+                .id(tokenId)
                 .subject(user.getId().toString())
                 .claim("login", user.getLogin())
                 .claim("role", user.getRole().name())
@@ -57,6 +58,18 @@ public final class TokenService {
                 .expiration(Date.from(expiresAt))
                 .signWith(secretKey)
                 .compact();
+
+        LocalDateTime loggedInAt = LocalDateTime.now();
+        LocalDateTime expiresAtLocal = loggedInAt.plusMinutes(expirationMinutes);
+
+        userSessionRepository.createSession(
+                user.getId(),
+                tokenId,
+                loggedInAt,
+                expiresAtLocal
+        );
+
+        return token;
     }
 
     public Long extractUserId(String token) {
@@ -75,15 +88,27 @@ public final class TokenService {
         return buildCredentialVersion(user).equals(tokenCredentialVersion);
     }
 
+    public boolean isSessionActive(String token) {
+        Claims claims = parseClaims(token);
+        String tokenId = claims.getId();
+        return tokenId != null && userSessionRepository.isSessionActive(tokenId);
+    }
+
     public void revokeToken(String token) {
-        revokedTokens.add(token);
+        Claims claims = parseClaims(token);
+        String tokenId = claims.getId();
+
+        if (tokenId != null) {
+            userSessionRepository.revokeSession(tokenId);
+        }
+    }
+
+    public List<LoggedInUserResponse> getLoggedInUsers() {
+        userSessionRepository.cleanupExpiredSessions();
+        return userSessionRepository.findLoggedInUsers();
     }
 
     private Claims parseClaims(String token) {
-        if (revokedTokens.contains(token)) {
-            throw new UnauthorizedException("Invalid or expired token");
-        }
-
         try {
             return Jwts.parser()
                     .verifyWith(secretKey)

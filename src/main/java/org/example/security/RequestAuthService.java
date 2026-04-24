@@ -37,6 +37,10 @@ public class RequestAuthService {
             throw new UnauthorizedException("Invalid or expired token");
         }
 
+        if (!tokenService.isSessionActive(token)) {
+            throw new UnauthorizedException("Invalid or expired token");
+        }
+
         return new RequestUserContext(userId, token, user.getRole());
     }
 

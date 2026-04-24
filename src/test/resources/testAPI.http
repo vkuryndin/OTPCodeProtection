@@ -1,10 +1,8 @@
 ### Base variables
 @host = http://localhost:8080
-###@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI2IiwibG9naW4iOiJhZG1pbiIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3Njc4Nzc1MCwiZXhwIjoxNzc2NzkxMzUwfQ.RYEl5qVgmjixZN7UwW3lI8CkqXRg8C3JxgzLmpY6Ofa2jfyDJ8r-udICfopZtoec
-###@userToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIxMSIsImxvZ2luIjoidXNlcl8yIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NzY4ODQzNjIsImV4cCI6MTc3Njg4Nzk2Mn0.cVY1pxQ0y4TF0dwqAHd3S3TpSjukdTtBwyVBdywk8TMSuyDxL9VVdU6XvrjVDWDv
 @userId = 5
 @otpFile = otp-codes.txt
-@otpCode = 599987
+@otpCode = 582748
 
 ### =====================================
 ### 0. FAST LOGIN
@@ -29,7 +27,7 @@ POST {{host}}/auth/login
 Content-Type: application/json
 
 {
-  "login": "user_4",
+  "login": "user_6",
   "password": "12345678"
 }
 > {%
@@ -47,8 +45,8 @@ Content-Type: application/json
   "password": "12345678"
 }
 > {%
-    client.global.set("userToken", response.body.token);
-    client.log("userToken = " + client.global.get("userToken"));
+    client.global.set("user2Token", response.body.token);
+    client.log("user2Token = " + client.global.get("user2Token"));
 %}
 
 
@@ -57,13 +55,13 @@ POST {{host}}/auth/login
 Content-Type: application/json
 
 {
-  "login": "user_7",
+  "login": "user_3",
   "password": "12345678"
 }
 
 > {%
-    client.global.set("userToken", response.body.token);
-    client.log("userToken = " + client.global.get("userToken"));
+    client.global.set("user3Token", response.body.token);
+    client.log("user3Token = " + client.global.get("user3Token"));
 %}
 
 ### =====================================
@@ -368,6 +366,11 @@ GET {{host}}/admin/users
 Authorization: Bearer {{userToken}}
 Accept: application/json
 
+### Get logged-in users as admin
+GET {{host}}/admin/logged-in-users
+Authorization: Bearer {{adminToken}}
+
+
 ### =====================================
 ### 7. DELETE TESTS
 ### =====================================
@@ -405,6 +408,16 @@ Accept: application/json
 ### Logout (valid token)
 POST {{host}}/auth/logout
 Authorization: Bearer {{userToken}}
+Accept: application/json
+
+### Logout (valid token)
+POST {{host}}/auth/logout
+Authorization: Bearer {{user2Token}}
+Accept: application/json
+
+### Logout (valid token)
+POST {{host}}/auth/logout
+Authorization: Bearer {{user3Token}}
 Accept: application/json
 
 ### Logout - no token
@@ -619,8 +632,6 @@ Content-Type: application/json
   "code": "123456"
 }
 
-
-
 ####
 
 ### Generate OTP to file as admin
@@ -652,7 +663,7 @@ Content-Type: application/json
 
 {
   "operationId": "payment-email-001",
-  "deliveryChannel": "EMAIL",
+  "deliveryChannel": "RussianPost",
   "deliveryTarget": "user@test.com"
 }
 ### Validate OTP from file
@@ -667,8 +678,6 @@ Content-Type: application/json
 
 ### test e-mail
 
-@emailTarget = YOUR_REAL_EMAIL
-
 ### Generate OTP to email as user
 POST {{host}}/otp/generate
 Authorization: Bearer {{userToken}}
@@ -676,9 +685,29 @@ Content-Type: application/json
 
 {
   "operationId": "payment-email-001",
-  "deliveryChannel": "EMAIL",
-  "deliveryTarget": "{{emailTarget}}"
+  "deliveryChannel": "EMAIL"
 }
+
+### Generate OTP to email as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{user2Token}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-email-001",
+  "deliveryChannel": "EMAIL"
+}
+
+### Generate OTP to email as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{user3Token}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-email-001",
+  "deliveryChannel": "EMAIL"
+}
+
 
 ### Generate OTP to file as user
 POST {{host}}/otp/generate
@@ -712,6 +741,28 @@ Content-Type: application/json
   "operationId": "payment-telegram-001",
   "deliveryChannel": "TELEGRAM"
 }
+
+### Generate OTP to telegram as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{user2Token}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-telegram-001",
+  "deliveryChannel": "TELEGRAM"
+}
+
+### Generate OTP to telegram as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{user3Token}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-telegram-001",
+  "deliveryChannel": "TELEGRAM"
+}
+
+
 ### Generate OTP to telegram as admin
 POST {{host}}/otp/generate
 Authorization: Bearer {{adminToken}}
@@ -759,6 +810,30 @@ Content-Type: application/json
   "operationId": "payment-sms-001",
   "deliveryChannel": "SMS"
 }
+
+
+### Generate OTP to SMS as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{user2Token}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-sms-001",
+  "deliveryChannel": "SMS"
+}
+
+### Generate OTP to SMS as user
+POST {{host}}/otp/generate
+Authorization: Bearer {{user3Token}}
+Content-Type: application/json
+
+{
+  "operationId": "payment-sms-001",
+  "deliveryChannel": "SMS"
+}
+
+
+
 ### Generate OTP to SMS as admin
 POST {{host}}/otp/generate
 Authorization: Bearer {{adminToken}}

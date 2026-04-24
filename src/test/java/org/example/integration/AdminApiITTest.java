@@ -10,8 +10,7 @@ import org.springframework.http.*;
 
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AdminApiITTest extends BaseIntegrationTest {
@@ -118,5 +117,40 @@ class AdminApiITTest extends BaseIntegrationTest {
 
         JsonNode body = objectMapper.readTree(response.getBody());
         assertEquals("Access denied", body.get("error").asText());
+    }
+    @Test
+    void getLoggedInUsers_shouldReturnCurrentlyLoggedInUsers_forAdmin() throws Exception {
+        String adminToken = loginAndGetToken(adminLogin);
+        loginAndGetToken(userLogin);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<String> response =
+                restTemplate.exchange("/admin/logged-in-users", HttpMethod.GET, entity, String.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+
+        boolean containsAdmin = false;
+        boolean containsUser = false;
+
+        for (JsonNode node : body) {
+            String login = node.get("login").asText();
+
+            if (adminLogin.equals(login)) {
+                containsAdmin = true;
+            }
+            if (userLogin.equals(login)) {
+                containsUser = true;
+            }
+        }
+
+        assertTrue(containsAdmin);
+        assertTrue(containsUser);
     }
 }
