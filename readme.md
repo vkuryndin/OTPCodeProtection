@@ -17,6 +17,8 @@ Backend-сервис для защиты операций одноразовым
   - Telegram;
   - SMS через SMPP-эмулятор.
 
+---
+
 ## Назначение проекта
 
 Проект выполнен как учебный backend-сервис в рамках курсовой работы по Специализированным инструментам разработки на языке Java.
@@ -31,6 +33,7 @@ Backend-сервис для защиты операций одноразовым
 - интеграции с внешними каналами доставки;
 - автоматизации тестирования;
 - базового security hardening для OTP-потока.
+---
 
 ## Используемые технологии
 
@@ -62,6 +65,201 @@ Backend-сервис для защиты операций одноразовым
 - SpotBugs
 - Spotless
 
+## Структура проекта
+
+```text
+otpService/
+├── build.gradle.kts                    # сборка проекта, зависимости, плагины, проверки качества
+├── readme.md                           # документация проекта
+│
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── org/example/
+│   │   │       ├── OtpServiceApplication.java
+│   │   │       │   # точка входа Spring Boot приложения
+│   │   │       │
+│   │   │       ├── config/
+│   │   │       │   ├── DbConfig.java
+│   │   │       │   └── RequestLoggingFilter.java
+│   │   │       │   # конфигурация подключения к БД и логирование HTTP-запросов
+│   │   │       │
+│   │   │       ├── controller/
+│   │   │       │   ├── AdminController.java
+│   │   │       │   ├── AuthController.java
+│   │   │       │   ├── GlobalExceptionHandler.java
+│   │   │       │   ├── HealthController.java
+│   │   │       │   ├── OtpController.java
+│   │   │       │   └── TelegramController.java
+│   │   │       │   # REST API приложения: auth, admin API, OTP API,
+│   │   │       │   # health-check, Telegram binding
+│   │   │       │
+│   │   │       ├── dto/
+│   │   │       │   ├── DeleteUserResponse.java
+│   │   │       │   ├── GenerateOtpRequest.java
+│   │   │       │   ├── LoggedInUserResponse.java
+│   │   │       │   ├── LoginRequest.java
+│   │   │       │   ├── LoginResponse.java
+│   │   │       │   ├── LogoutResponse.java
+│   │   │       │   ├── OtpGenerationResponse.java
+│   │   │       │   ├── OtpValidationResponse.java
+│   │   │       │   ├── RegisterRequest.java
+│   │   │       │   ├── RegisterResponse.java
+│   │   │       │   ├── UpdateOtpConfigRequest.java
+│   │   │       │   ├── UpdateOtpConfigResponse.java
+│   │   │       │   ├── UserResponse.java
+│   │   │       │   └── ValidateOtpRequest.java
+│   │   │       │   # DTO для входящих запросов и исходящих ответов API
+│   │   │       │
+│   │   │       ├── exception/
+│   │   │       │   ├── NotFoundException.java
+│   │   │       │   └── UnauthorizedException.java
+│   │   │       │   # прикладные исключения
+│   │   │       │
+│   │   │       ├── model/
+│   │   │       │   ├── DeliveryChannel.java
+│   │   │       │   ├── OtpCode.java
+│   │   │       │   ├── OtpConfig.java
+│   │   │       │   ├── OtpStatus.java
+│   │   │       │   ├── Role.java
+│   │   │       │   └── User.java
+│   │   │       │   # доменные модели приложения
+│   │   │       │
+│   │   │       ├── repository/
+│   │   │       │   ├── ConnectionFactory.java
+│   │   │       │   ├── OtpCodeRepository.java
+│   │   │       │   ├── OtpConfigRepository.java
+│   │   │       │   ├── UserRepository.java
+│   │   │       │   └── UserSessionRepository.java
+│   │   │       │   # JDBC-слой доступа к PostgreSQL
+│   │   │       │
+│   │   │       ├── security/
+│   │   │       │   ├── AuthUtil.java
+│   │   │       │   ├── PasswordHasher.java
+│   │   │       │   └── RequestAuthService.java
+│   │   │       │   # Bearer token, проверка роли и сессии, хеширование паролей
+│   │   │       │
+│   │   │       ├── service/
+│   │   │       │   ├── AuthService.java
+│   │   │       │   ├── EmailDeliveryService.java
+│   │   │       │   ├── FileDeliveryService.java
+│   │   │       │   ├── GenerateOtpRateLimitService.java
+│   │   │       │   ├── OtpExpirationService.java
+│   │   │       │   ├── OtpService.java
+│   │   │       │   ├── SessionCleanupService.java
+│   │   │       │   ├── SmsDeliveryService.java
+│   │   │       │   ├── TelegramBindingService.java
+│   │   │       │   ├── TelegramDeliveryService.java
+│   │   │       │   └── TokenService.java
+│   │   │       │   # бизнес-логика приложения, OTP-поток, доставка,
+│   │   │       │   # JWT, user sessions, cleanup, rate limit, brute force protection
+│   │   │       │
+│   │   │       └── util/
+│   │   │           └── AuthValidationUtil.java
+│   │   │           # общая валидация входных данных для auth-запросов
+│   │   │
+│   │   └── resources/
+│   │       ├── application.properties
+│   │       ├── db.properties
+│   │       ├── db.properties.example
+│   │       └── db/
+│   │           └── migration/
+│   │               └── schema.sql
+│   │               # SQL-схема PostgreSQL
+│   │
+│   └── test/
+│       ├── java/
+│       │   └── org/example/
+│       │       ├── controller/
+│       │       │   ├── AdminControllerTest.java
+│       │       │   ├── AuthControllerTest.java
+│       │       │   ├── HealthControllerTest.java
+│       │       │   ├── OtpControllerTest.java
+│       │       │   └── TelegramControllerTest.java
+│       │       │   # controller-level tests
+│       │       │
+│       │       ├── integration/
+│       │       │   ├── BaseIntegrationTest.java
+│       │       │   # базовый класс integration tests
+│       │       │   │
+│       │       │   ├── support/
+│       │       │   │   ├── TestDbHelper.java
+│       │       │   │   ├── TestHttpAssertions.java
+│       │       │   │   ├── TestRequests.java
+│       │       │   │   └── TestUsers.java
+│       │       │   │   # общие test helpers для интеграционных тестов
+│       │       │   │
+│       │       │   ├── AdminApiITTest.java
+│       │       │   ├── AdminUsersApiITTest.java
+│       │       │   ├── AuthApiITTest.java
+│       │       │   ├── DeliveryValidationApiITTest.java
+│       │       │   ├── HealthApiITTest.java
+│       │       │   ├── OtpApiITRefactorTest.java
+│       │       │   ├── OtpAuthApiITTest.java
+│       │       │   ├── OtpConcurrentBruteforceApiITTest.java
+│       │       │   ├── OtpConcurrentSameOperationGenerateApiITTest.java
+│       │       │   ├── OtpConcurrentValidationApiITTest.java
+│       │       │   ├── OtpConfigValidationApiITTest.java
+│       │       │   ├── OtpGenerateConcurrentRateLimitApiITTest.java
+│       │       │   ├── OtpGenerateRateLimitApiITTest.java
+│       │       │   ├── OtpRequestValidationApiITTest.java
+│       │       │   ├── RegisterApiITRefactorTest.java
+│       │       │   ├── RegisterValidationApiITTest.java
+│       │       │   ├── TelegramBindingApiITTest.java
+│       │       │   ├── UserDeleteCascadeApiITTest.java
+│       │       │   ├── UserSessionRepositoryActiveSessionITTest.java
+│       │       │   └── UserSessionRepositoryCleanupITTest.java
+│       │       │   # интеграционные тесты API, авторизации, OTP,
+│       │       │   # конкурентных сценариев и JDBC-репозиториев
+│       │       │
+│       │       ├── security/
+│       │       │   └── PasswordHasherTest.java
+│       │       │   # тесты security-утилит
+│       │       │
+│       │       ├── service/
+│       │       │   ├── AuthServiceTest.java
+│       │       │   ├── GenerateOtpRateLimitServiceTest.java
+│       │       │   ├── OtpServiceCleanupTest.java
+│       │       │   ├── OtpServiceTest.java
+│       │       │   ├── SessionCleanupServiceTest.java
+│       │       │   ├── TelegramBindingServiceTest.java
+│       │       │   └── TokenServiceTest.java
+│       │       │   # unit-тесты сервисного слоя
+│       │       │
+│       │       └── util/
+│       │           └── AuthValidationUtilTest.java
+│       │           # тесты util-классов
+│       │
+│       └── resources/
+│           ├── application-test.properties
+│           ├── db.properties
+│           └── testAPI.http
+│           # test profile, test database и ручные HTTP-сценарии
+```
+### Описание пакетов проекта
+
+#### Основной код (`src/main/java/org/example`)
+
+- **`config`** — конфигурационные классы приложения. Здесь настраивается подключение к базе данных (`DbConfig`) и регистрируются веб-фильтры, например `RequestLoggingFilter` для логирования запросов.
+- **`controller`** — REST-контроллеры, которые обрабатывают HTTP-запросы, выполняют базовую валидацию входных данных и передают управление в слой сервисов (`AuthController`, `OtpController`, `AdminController` и др.). Также включает `GlobalExceptionHandler` для централизованной обработки ошибок.
+- **`dto`** — объекты передачи данных для запросов и ответов API. Используются для сериализации и десериализации JSON (`LoginRequest`, `GenerateOtpRequest`, `UserResponse` и др.).
+- **`exception`** — пользовательские классы исключений, отражающие ошибки бизнес-логики (`NotFoundException`, `RateLimitExceededException`, `UnauthorizedException`).
+- **`model`** — доменные сущности приложения и перечисления (`User`, `OtpCode`, `OtpConfig`, `Role`, `DeliveryChannel`), отражающие бизнес-модель и структуру данных.
+- **`repository`** — слой доступа к данным. Содержит классы для прямого взаимодействия с PostgreSQL через JDBC (`UserRepository`, `OtpCodeRepository`, `UserSessionRepository`), а также фабрику подключений (`ConnectionFactory`).
+- **`security`** — компоненты, связанные с безопасностью приложения: хеширование паролей (`PasswordHasher`), работа с токенами (`AuthUtil`) и авторизация запросов (`RequestAuthService`).
+- **`service`** — слой бизнес-логики. Содержит основные сервисы (`OtpService`, `AuthService`, `TokenService`), фоновые задачи (`SessionCleanupService`, `OtpExpirationService`) и реализации каналов доставки OTP (`EmailDeliveryService`, `TelegramDeliveryService`, `SmsDeliveryService`, `FileDeliveryService`).
+- **`util`** — вспомогательные утилиты общего назначения, например `AuthValidationUtil`.
+
+#### Тестовый код (`src/test/java/org/example`)
+
+- **`controller`** — тесты контроллеров, проверяющие обработку запросов и формирование HTTP-ответов с использованием моков.
+- **`integration`** — интеграционные тесты приложения (`*ITTest`). Проверяют работу системы в сборе: взаимодействие с тестовой базой данных, сквозные сценарии (регистрация → логин → генерация OTP → валидация), каскадное удаление, работу rate limit, а также устойчивость к конкурентным запросам и перебору OTP.
+- **`integration.support`** — вспомогательные классы для интеграционных тестов: проверки HTTP-ответов (`TestHttpAssertions`), хелперы для работы с тестовой БД (`TestDbHelper`) и фабрики тестовых данных (`TestUsers`, `TestRequests`).
+- **`security`** — тесты для проверки хеширования паролей и security-утилит.
+- **`service`** — тесты сервисного слоя. Изолированно проверяют бизнес-логику генерации и валидации OTP, работу ограничений, очистку сессий и другие сценарии с использованием моков репозиториев.
+- **`util`** — тесты для вспомогательных утилит.
+
+---
 ## Основные сущности
 
 В проекте используются основные таблицы:
@@ -75,15 +273,15 @@ Backend-сервис для защиты операций одноразовым
 - `USED` — код успешно использован;
 - `EXPIRED` — срок действия кода истёк.
 
+---
 ## Роли пользователей
 
 ### ADMIN
 Администратор может:
 - изменять длину OTP-кода и срок его действия;
 - получать список всех пользователей, кроме администраторов;
-- удалять пользователей;
-- удалять пользователей вместе с их OTP-кодами.
-- просматривать всех залогиненных пользователей в системе
+- удалять пользователей вместе с их OTP-кодами;
+- просматривать пользователей с активными сессиями.
 
 ### USER
 Обычный пользователь может:
@@ -92,6 +290,7 @@ Backend-сервис для защиты операций одноразовым
 - привязывать Telegram для получения кодов;
 - получать OTP по доступным каналам доставки.
 
+---
 ## Каналы доставки OTP
 
 Сервис поддерживает четыре канала доставки OTP.
@@ -121,6 +320,7 @@ OTP отправляется через SMPP-эмулятор.
 Для локального тестирования использовался Auron SMPP simulator.  
 Для канала `SMS` поле `deliveryTarget` передавать нельзя.
 
+---
 ## База данных
 
 Используется PostgreSQL 17.
@@ -133,10 +333,11 @@ OTP отправляется через SMPP-эмулятор.
 - статусы OTP фиксируются на уровне базы и приложения;
 - при повторной генерации OTP для той же пары `userId + operationId` предыдущие активные OTP переводятся в `EXPIRED`;
 - активные пользовательские сессии хранятся в таблице `user_sessions`;
-- logout помечает сессию как отозванную, а истёкшие и revoked-сессии очищаются по расписанию.
+- logout помечает сессию как отозванную, а истёкшие и отозванные сессии очищаются по расписанию.
 
-- SQL-схема находится в файле `schema.sql`.
+SQL-схема находится в файле `src/main/resources/db/migration/schema.sql`.
 
+---
 ## Конфигурация
 
 Для запуска приложения необходимо настроить:
@@ -149,66 +350,62 @@ OTP отправляется через SMPP-эмулятор.
 - параметры SMPP simulator;
 - настройки rate limiting для генерации OTP.
 
-Основные параметры приложения находятся в `application.properties`.
+Основные параметры приложения находятся в `application.properties`. Для тестовой базы можно задавать отдельные параметры в файле `application-test.properties`.
 
-### Правила поля deliveryTarget
-
-Поле `deliveryTarget` зависит от выбранного канала доставки:
-
-- `FILE` — поле обязательно;
-- `EMAIL` — поле запрещено;
-- `SMS` — поле запрещено;
-- `TELEGRAM` — поле запрещено.
-
-Для каналов `EMAIL`, `SMS` и `TELEGRAM` сервис использует данные пользователя из базы:
-- email;
-- phone;
-- telegram_chat_id.
-
+---
 ## Подготовка к запуску
 
 Перед запуском приложения необходимо:
 1. создать базу данных PostgreSQL;
-2. применить SQL-схему из файла `schema.sql`;
+2. применить SQL-схему из файла `src/main/resources/db/migration/schema.sql`;
 3. настроить конфигурационные файлы;
 4. при необходимости подготовить SMTP, Telegram и SMPP;
 5. убедиться, что тестовая база данных тоже создана и настроена отдельно от основной.
+
+---
 
 ## Запуск приложения
 
 После подготовки базы данных и конфигурации приложение можно запустить через Gradle.
 
-Пример
+```bash
+./gradlew bootRun
+```
 
 После запуска сервис по умолчанию доступен по адресу:
+```
+http://localhost:8080
+```
 
-Пример
-
+---
 ## Основные API endpoints
 
 ### Auth
-- `POST /auth/register` — регистрация пользователя
-- `POST /auth/login` — вход в систему
-- `POST /auth/logout` — выход из системы
+- `POST /auth/register` — регистрация нового пользователя
+- `POST /auth/login` — вход в систему и получение токена
+- `POST /auth/logout` — выход из системы и отзыв активной сессии
 
 ### Health
 - `GET /health` — проверка доступности приложения
-- `GET /health/db` — проверка подключения к БД
+- `GET /health/db` — проверка подключения к базе данных
 
-### Admin API
-- `GET /admin/users` — список всех пользователей, кроме администраторов
-- `DELETE /admin/users/{id}` — удаление пользователя и его OTP-кодов
-- `GET /admin/otp-config` — получение текущей конфигурации OTP
-- `PUT /admin/otp-config` — изменение длины OTP и времени жизни
+### Admin API (`ADMIN`)
+- `GET /admin/users` — получить список всех пользователей, кроме администраторов
+- `DELETE /admin/users/{id}` — удалить пользователя и связанные с ним OTP-коды
+- `GET /admin/logged-in-users` — получить список пользователей с активными сессиями
+- `GET /admin/otp-config` — получить текущую конфигурацию OTP-кодов
+- `PUT /admin/otp-config` — изменить длину OTP-кода и время его жизни
 
-### User OTP API
-- `POST /otp/generate` — генерация OTP
-- `POST /otp/validate` — проверка OTP
+### User OTP API (требует авторизацию)
+- `POST /otp/generate` — сгенерировать OTP для `operationId` и отправить его по выбранному каналу
+- `POST /otp/validate` — проверить OTP-код для указанной операции
 
-### Telegram API
-- `POST /telegram/bind/start` — запуск привязки Telegram
-- `POST /telegram/bind/complete` — завершение привязки Telegram
+### Telegram API (требует авторизацию)
+- `POST /telegram/bind/start` — запустить привязку Telegram
+- `POST /telegram/bind/complete` — завершить привязку Telegram
 
+
+---
 ## Основные сценарии использования
 
 ### Сценарий 1. Регистрация и вход
@@ -221,7 +418,7 @@ OTP отправляется через SMPP-эмулятор.
 2. Передаёт `operationId`.
 3. Указывает канал доставки.
 4. Для канала `FILE` дополнительно передаёт `deliveryTarget` — путь к файлу.
-5. Для каналов `EMAIL`, `SMS`, `TELEGRAM` поле `deliveryTarget` передавать нельзя: адрес доставки берётся из данных пользователя в базе.
+5. Для каналов `EMAIL`, `SMS` и `TELEGRAM` адрес доставки берётся из данных пользователя в базе.
 6. Получает OTP через выбранный канал.
 
 ### Сценарий 3. Проверка OTP
@@ -234,7 +431,7 @@ OTP отправляется через SMPP-эмулятор.
 2. Просматривает список пользователей.
 3. Изменяет конфигурацию OTP.
 4. При необходимости удаляет пользователя.
-5. Администратор может просматривать всех пользователей системы, всех залогиненных пользователей.
+5. Администратор может просматривать список пользователей и список пользователей с активными сессиями.
 
 ### Сценарий 5. Привязка Telegram
 1. Пользователь запускает привязку Telegram.
@@ -242,6 +439,7 @@ OTP отправляется через SMPP-эмулятор.
 3. Подтверждает привязку.
 4. После этого может получать OTP через Telegram.
 
+---
 ## Безопасность и ограничения
 
 В проекте реализованы следующие защитные механизмы:
@@ -259,13 +457,14 @@ OTP отправляется через SMPP-эмулятор.
 - in-memory структуры используются только для ограничения генерации OTP и для временного хранения счётчиков неверных попыток валидации OTP;
 - in-memory структуры очищаются по расписанию, чтобы не накапливать устаревшие записи.
 
-- Ограничение на генерацию OTP настраивается через параметры:
+Ограничение на генерацию OTP настраивается через параметры:
 - `otp.generate-rate-limit.enabled`
 - `otp.generate-rate-limit.max-attempts`
 - `otp.generate-rate-limit.window-seconds`
 
 Для тестового профиля ограничение генерации OTP отключено, чтобы не влиять на выполнение автоматических тестов.
 
+---
 ## Обработка ошибок
 
 В проекте разделены основные типы ошибок:
@@ -308,12 +507,17 @@ OTP отправляется через SMPP-эмулятор.
 - конкурентная валидация OTP;
 - конкурентная генерация OTP для одной и той же операции;
 - controller-level проверки `429` для rate limit;
-- controller-level проверки `503` для недоступности внешних каналов доставки.
+- controller-level проверки `503` для недоступности внешних каналов доставки;
+- хранение пользовательских сессий в базе данных;
+- cleanup истёкших и отованных пользовательских сессий;
 
 ### Запуск тестов
 
-Пример
+```bash
+./gradlew test
+```
 
+---
 ## Ручная проверка API
 
 Для ручной проверки запросов используется файл `testAPI.http`.
@@ -327,6 +531,7 @@ OTP отправляется через SMPP-эмулятор.
 - Telegram binding;
 - работы каналов доставки.
 
+---
 ## Логирование
 
 В приложении настроено логирование:
@@ -340,11 +545,14 @@ OTP отправляется через SMPP-эмулятор.
 - очистки OTP после неудачной доставки;
 - срабатывания rate limit и защиты от brute force;
 - очистки устаревших записей ограничений и попыток валидации;
+- очистки истёкших и отозванных пользовательских сессий;
 - перевода старых OTP в `EXPIRED` при повторной генерации.
 
 Логи выводятся:
 - в консоль;
 - в файл.
+
+---
 
 ## Дополнительные замечания
 
@@ -355,15 +563,13 @@ OTP отправляется через SMPP-эмулятор.
 - При удалении пользователя его OTP-коды удаляются автоматически.
 - Просроченные OTP-коды помечаются в фоне как `EXPIRED`.
 - Ограничение на генерацию OTP в тестовом профиле отключено.
-- Хранилище отозванных токенов и счётчики ограничений реализованы в памяти приложения, что подходит для учебного проекта и одиночного инстанса сервиса.
 - Активные и отозванные пользовательские сессии хранятся в базе данных.
 - In-memory структуры используются только для rate limit генерации OTP и счётчиков неверных попыток валидации.
 
+---
 ## Итог
 
-Проект демонстрирует реализацию backend-сервиса защиты операций одноразовыми OTP-кодами на Java.
-
-В рамках проекта реализованы:
+В рамках курсовой работы реализованы:
 - работа с PostgreSQL 17 через JDBC;
 - токенная аутентификация и авторизация с хранением пользовательских сессий в базе данных;
 - разграничение ролей `ADMIN` и `USER`;
@@ -379,4 +585,3 @@ OTP отправляется через SMPP-эмулятор.
 - удаление созданного OTP из базы при ошибке доставки;
 - деактивация старых активных OTP при повторной генерации для той же операции;
 - покрытие бизнес-логики, контроллеров и API автоматическими тестами.
-
