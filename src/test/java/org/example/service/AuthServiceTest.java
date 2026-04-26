@@ -1,5 +1,9 @@
 package org.example.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import org.example.dto.RegisterRequest;
 import org.example.model.Role;
 import org.example.model.User;
@@ -12,215 +16,201 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Locale;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
-    @Mock
-    private UserRepository userRepository;
+  @Mock private UserRepository userRepository;
 
-    @Mock
-    private PasswordHasher passwordHasher;
+  @Mock private PasswordHasher passwordHasher;
 
-    @Mock
-    private TokenService tokenService;
+  @Mock private TokenService tokenService;
 
-    @InjectMocks
-    private AuthService authService;
+  @InjectMocks private AuthService authService;
 
-    @Test
-    void register_shouldCreateUser_whenRequestIsValid() {
-        RegisterRequest request = new RegisterRequest();
-        request.setLogin("user_1");
-        request.setPassword("12345678");
-        request.setRole(Role.USER);
-        request.setEmail("user_1@test.com");
-        request.setPhone("+37400112233");
-        request.setTelegramChatId("123456789");
+  @Test
+  void register_shouldCreateUser_whenRequestIsValid() {
+    RegisterRequest request = new RegisterRequest();
+    request.setLogin("user_1");
+    request.setPassword("12345678");
+    request.setRole(Role.USER);
+    request.setEmail("user_1@test.com");
+    request.setPhone("+37400112233");
+    request.setTelegramChatId("123456789");
 
-        when(userRepository.findByLogin("user_1")).thenReturn(null);
-        when(passwordHasher.hash("12345678")).thenReturn("hashed_password");
-        when(userRepository.createUser(any(User.class))).thenReturn(10L);
+    when(userRepository.findByLogin("user_1")).thenReturn(null);
+    when(passwordHasher.hash("12345678")).thenReturn("hashed_password");
+    when(userRepository.createUser(any(User.class))).thenReturn(10L);
 
-        Long userId = authService.register(request);
+    Long userId = authService.register(request);
 
-        assertEquals(10L, userId);
+    assertEquals(10L, userId);
 
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).createUser(userCaptor.capture());
+    ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).createUser(userCaptor.capture());
 
-        User savedUser = userCaptor.getValue();
-        assertEquals("user_1", savedUser.getLogin());
-        assertEquals("hashed_password", savedUser.getPasswordHash());
-        assertEquals(Role.USER, savedUser.getRole());
-        assertEquals("user_1@test.com", savedUser.getEmail());
-        assertEquals("+37400112233", savedUser.getPhone());
-        assertEquals("123456789", savedUser.getTelegramChatId());
+    User savedUser = userCaptor.getValue();
+    assertEquals("user_1", savedUser.getLogin());
+    assertEquals("hashed_password", savedUser.getPasswordHash());
+    assertEquals(Role.USER, savedUser.getRole());
+    assertEquals("user_1@test.com", savedUser.getEmail());
+    assertEquals("+37400112233", savedUser.getPhone());
+    assertEquals("123456789", savedUser.getTelegramChatId());
 
-        verify(passwordHasher).hash("12345678");
-    }
+    verify(passwordHasher).hash("12345678");
+  }
 
-    @Test
-    void register_shouldNormalizeLoginToLowerCase_whenMixedCaseLoginIsProvided() {
-        RegisterRequest request = new RegisterRequest();
-        request.setLogin("User_One");
-        request.setPassword("12345678");
-        request.setRole(Role.USER);
-        request.setEmail("user_1@test.com");
-        request.setPhone("+37400112233");
-        request.setTelegramChatId("123456789");
+  @Test
+  void register_shouldNormalizeLoginToLowerCase_whenMixedCaseLoginIsProvided() {
+    RegisterRequest request = new RegisterRequest();
+    request.setLogin("User_One");
+    request.setPassword("12345678");
+    request.setRole(Role.USER);
+    request.setEmail("user_1@test.com");
+    request.setPhone("+37400112233");
+    request.setTelegramChatId("123456789");
 
-        when(userRepository.findByLogin("user_one")).thenReturn(null);
-        when(passwordHasher.hash("12345678")).thenReturn("hashed_password");
-        when(userRepository.createUser(any(User.class))).thenReturn(11L);
+    when(userRepository.findByLogin("user_one")).thenReturn(null);
+    when(passwordHasher.hash("12345678")).thenReturn("hashed_password");
+    when(userRepository.createUser(any(User.class))).thenReturn(11L);
 
-        Long userId = authService.register(request);
+    Long userId = authService.register(request);
 
-        assertEquals(11L, userId);
+    assertEquals(11L, userId);
 
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).createUser(userCaptor.capture());
+    ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).createUser(userCaptor.capture());
 
-        User savedUser = userCaptor.getValue();
-        assertEquals("user_one", savedUser.getLogin());
-        assertEquals("hashed_password", savedUser.getPasswordHash());
-        assertEquals(Role.USER, savedUser.getRole());
-    }
+    User savedUser = userCaptor.getValue();
+    assertEquals("user_one", savedUser.getLogin());
+    assertEquals("hashed_password", savedUser.getPasswordHash());
+    assertEquals(Role.USER, savedUser.getRole());
+  }
 
-    @Test
-    void register_shouldThrowIllegalArgumentException_whenLoginAlreadyExists() {
-        RegisterRequest request = new RegisterRequest();
-        request.setLogin("duplicate_user");
-        request.setPassword("12345678");
-        request.setRole(Role.USER);
+  @Test
+  void register_shouldThrowIllegalArgumentException_whenLoginAlreadyExists() {
+    RegisterRequest request = new RegisterRequest();
+    request.setLogin("duplicate_user");
+    request.setPassword("12345678");
+    request.setRole(Role.USER);
 
-        User existingUser = new User();
-        existingUser.setId(1L);
-        existingUser.setLogin("duplicate_user");
+    User existingUser = new User();
+    existingUser.setId(1L);
+    existingUser.setLogin("duplicate_user");
 
-        when(userRepository.findByLogin("duplicate_user")).thenReturn(existingUser);
+    when(userRepository.findByLogin("duplicate_user")).thenReturn(existingUser);
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> authService.register(request)
-        );
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> authService.register(request));
 
-        assertEquals("User with this login already exists", exception.getMessage());
+    assertEquals("User with this login already exists", exception.getMessage());
 
-        verify(userRepository, never()).createUser(any(User.class));
-        verify(passwordHasher, never()).hash(any());
-    }
+    verify(userRepository, never()).createUser(any(User.class));
+    verify(passwordHasher, never()).hash(any());
+  }
 
-    @Test
-    void register_shouldThrowIllegalStateException_whenSecondAdminIsCreated() {
-        RegisterRequest request = new RegisterRequest();
-        request.setLogin("second_admin");
-        request.setPassword("12345678");
-        request.setRole(Role.ADMIN);
+  @Test
+  void register_shouldThrowIllegalStateException_whenSecondAdminIsCreated() {
+    RegisterRequest request = new RegisterRequest();
+    request.setLogin("second_admin");
+    request.setPassword("12345678");
+    request.setRole(Role.ADMIN);
 
-        when(userRepository.findByLogin("second_admin")).thenReturn(null);
-        when(userRepository.adminExists()).thenReturn(true);
+    when(userRepository.findByLogin("second_admin")).thenReturn(null);
+    when(userRepository.adminExists()).thenReturn(true);
 
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> authService.register(request)
-        );
+    IllegalStateException exception =
+        assertThrows(IllegalStateException.class, () -> authService.register(request));
 
-        assertEquals("Admin already exists", exception.getMessage());
+    assertEquals("Admin already exists", exception.getMessage());
 
-        verify(userRepository, never()).createUser(any(User.class));
-        verify(passwordHasher, never()).hash(any());
-    }
+    verify(userRepository, never()).createUser(any(User.class));
+    verify(passwordHasher, never()).hash(any());
+  }
 
-    @Test
-    void authenticate_shouldReturnUser_whenCredentialsAreValid() {
-        User user = new User();
-        user.setId(5L);
-        user.setLogin("valid_user");
-        user.setPasswordHash("hashed_password");
-        user.setRole(Role.USER);
+  @Test
+  void authenticate_shouldReturnUser_whenCredentialsAreValid() {
+    User user = new User();
+    user.setId(5L);
+    user.setLogin("valid_user");
+    user.setPasswordHash("hashed_password");
+    user.setRole(Role.USER);
 
-        when(userRepository.findByLogin("valid_user")).thenReturn(user);
-        when(passwordHasher.matches("12345678", "hashed_password")).thenReturn(true);
+    when(userRepository.findByLogin("valid_user")).thenReturn(user);
+    when(passwordHasher.matches("12345678", "hashed_password")).thenReturn(true);
 
-        User result = authService.authenticate("valid_user", "12345678");
+    User result = authService.authenticate("valid_user", "12345678");
 
-        assertNotNull(result);
-        assertEquals(5L, result.getId());
-        assertEquals("valid_user", result.getLogin());
-        assertEquals(Role.USER, result.getRole());
-    }
+    assertNotNull(result);
+    assertEquals(5L, result.getId());
+    assertEquals("valid_user", result.getLogin());
+    assertEquals(Role.USER, result.getRole());
+  }
 
-    @Test
-    void authenticate_shouldReturnUser_whenLoginHasDifferentCase() {
-        User user = new User();
-        user.setId(7L);
-        user.setLogin("valid_user");
-        user.setPasswordHash("hashed_password");
-        user.setRole(Role.USER);
+  @Test
+  void authenticate_shouldReturnUser_whenLoginHasDifferentCase() {
+    User user = new User();
+    user.setId(7L);
+    user.setLogin("valid_user");
+    user.setPasswordHash("hashed_password");
+    user.setRole(Role.USER);
 
-        when(userRepository.findByLogin("valid_user")).thenReturn(user);
-        when(passwordHasher.matches("12345678", "hashed_password")).thenReturn(true);
+    when(userRepository.findByLogin("valid_user")).thenReturn(user);
+    when(passwordHasher.matches("12345678", "hashed_password")).thenReturn(true);
 
-        User result = authService.authenticate("VALID_USER", "12345678");
+    User result = authService.authenticate("VALID_USER", "12345678");
 
-        assertNotNull(result);
-        assertEquals(7L, result.getId());
-        assertEquals("valid_user", result.getLogin());
-        assertEquals(Role.USER, result.getRole());
-    }
+    assertNotNull(result);
+    assertEquals(7L, result.getId());
+    assertEquals("valid_user", result.getLogin());
+    assertEquals(Role.USER, result.getRole());
+  }
 
-    @Test
-    void authenticate_shouldTrimAndNormalizeLogin_whenLoginContainsSpacesAndDifferentCase() {
-        User user = new User();
-        user.setId(8L);
-        user.setLogin("valid_user");
-        user.setPasswordHash("hashed_password");
-        user.setRole(Role.USER);
+  @Test
+  void authenticate_shouldTrimAndNormalizeLogin_whenLoginContainsSpacesAndDifferentCase() {
+    User user = new User();
+    user.setId(8L);
+    user.setLogin("valid_user");
+    user.setPasswordHash("hashed_password");
+    user.setRole(Role.USER);
 
-        when(userRepository.findByLogin("valid_user")).thenReturn(user);
-        when(passwordHasher.matches("12345678", "hashed_password")).thenReturn(true);
+    when(userRepository.findByLogin("valid_user")).thenReturn(user);
+    when(passwordHasher.matches("12345678", "hashed_password")).thenReturn(true);
 
-        User result = authService.authenticate("  VaLiD_UsEr  ", "12345678");
+    User result = authService.authenticate("  VaLiD_UsEr  ", "12345678");
 
-        assertNotNull(result);
-        assertEquals(8L, result.getId());
-        assertEquals("valid_user", result.getLogin());
-        assertEquals(Role.USER, result.getRole());
-    }
+    assertNotNull(result);
+    assertEquals(8L, result.getId());
+    assertEquals("valid_user", result.getLogin());
+    assertEquals(Role.USER, result.getRole());
+  }
 
-    @Test
-    void authenticate_shouldThrowIllegalArgumentException_whenPasswordIsWrong() {
-        User user = new User();
-        user.setId(6L);
-        user.setLogin("user_wrong_password");
-        user.setPasswordHash("hashed_password");
+  @Test
+  void authenticate_shouldThrowIllegalArgumentException_whenPasswordIsWrong() {
+    User user = new User();
+    user.setId(6L);
+    user.setLogin("user_wrong_password");
+    user.setPasswordHash("hashed_password");
 
-        when(userRepository.findByLogin("user_wrong_password")).thenReturn(user);
-        when(passwordHasher.matches("wrongpass", "hashed_password")).thenReturn(false);
+    when(userRepository.findByLogin("user_wrong_password")).thenReturn(user);
+    when(passwordHasher.matches("wrongpass", "hashed_password")).thenReturn(false);
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> authService.authenticate("user_wrong_password", "wrongpass")
-        );
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> authService.authenticate("user_wrong_password", "wrongpass"));
 
-        assertEquals("Invalid login or password", exception.getMessage());
-    }
+    assertEquals("Invalid login or password", exception.getMessage());
+  }
 
-    @Test
-    void authenticate_shouldThrowIllegalArgumentException_whenUserNotFound() {
-        when(userRepository.findByLogin("missing_user")).thenReturn(null);
+  @Test
+  void authenticate_shouldThrowIllegalArgumentException_whenUserNotFound() {
+    when(userRepository.findByLogin("missing_user")).thenReturn(null);
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> authService.authenticate("missing_user", "12345678")
-        );
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> authService.authenticate("missing_user", "12345678"));
 
-        assertEquals("Invalid login or password", exception.getMessage());
-    }
+    assertEquals("Invalid login or password", exception.getMessage());
+  }
 }

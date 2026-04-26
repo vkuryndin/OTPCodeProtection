@@ -7,38 +7,36 @@ import org.example.model.DeliveryChannel;
 
 public final class TestRequests {
 
-    private TestRequests() {
-    }
+  private TestRequests() {}
 
-    public static LoginRequest login(String login, String password) {
-        LoginRequest request = new LoginRequest();
-        request.setLogin(login);
-        request.setPassword(password);
-        return request;
-    }
+  public static LoginRequest login(String login, String password) {
+    LoginRequest request = new LoginRequest();
+    request.setLogin(login);
+    request.setPassword(password);
+    return request;
+  }
 
-    public static GenerateOtpRequest generateFileOtp(String operationId, String filePath) {
-        GenerateOtpRequest request = new GenerateOtpRequest();
-        request.setOperationId(operationId);
-        request.setDeliveryChannel(DeliveryChannel.FILE);
-        request.setDeliveryTarget(filePath);
-        return request;
-    }
+  public static GenerateOtpRequest generateFileOtp(String operationId, String filePath) {
+    GenerateOtpRequest request = new GenerateOtpRequest();
+    request.setOperationId(operationId);
+    request.setDeliveryChannel(DeliveryChannel.FILE);
+    request.setDeliveryTarget(filePath);
+    return request;
+  }
 
-    public static GenerateOtpRequest generateOtp(String operationId,
-                                                 DeliveryChannel channel,
-                                                 String deliveryTarget) {
-        GenerateOtpRequest request = new GenerateOtpRequest();
-        request.setOperationId(operationId);
-        request.setDeliveryChannel(channel);
-        request.setDeliveryTarget(deliveryTarget);
-        return request;
-    }
+  public static GenerateOtpRequest generateOtp(
+      String operationId, DeliveryChannel channel, String deliveryTarget) {
+    GenerateOtpRequest request = new GenerateOtpRequest();
+    request.setOperationId(operationId);
+    request.setDeliveryChannel(channel);
+    request.setDeliveryTarget(deliveryTarget);
+    return request;
+  }
 
-    public static ValidateOtpRequest validateOtp(String operationId, String code) {
-        ValidateOtpRequest request = new ValidateOtpRequest();
-        request.setOperationId(operationId);
-        request.setCode(code);
-        return request;
-    }
+  public static ValidateOtpRequest validateOtp(String operationId, String code) {
+    ValidateOtpRequest request = new ValidateOtpRequest();
+    request.setOperationId(operationId);
+    request.setCode(code);
+    return request;
+  }
 }

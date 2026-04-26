@@ -9,33 +9,36 @@ import org.example.security.RequestAuthService;
 import org.example.service.OtpService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/otp")
 public class OtpController {
 
-    private final OtpService otpService;
-    private final RequestAuthService requestAuthService;
+  private final OtpService otpService;
+  private final RequestAuthService requestAuthService;
 
-    public OtpController(OtpService otpService, RequestAuthService requestAuthService) {
-        this.otpService = otpService;
-        this.requestAuthService = requestAuthService;
-    }
+  public OtpController(OtpService otpService, RequestAuthService requestAuthService) {
+    this.otpService = otpService;
+    this.requestAuthService = requestAuthService;
+  }
 
-    @PostMapping("/generate")
-    public ResponseEntity<OtpGenerationResponse> generateOtp(@RequestBody GenerateOtpRequest request,
-                                                             HttpServletRequest httpRequest) {
-        Long userId = requestAuthService.extractUserId(httpRequest);
-        OtpGenerationResponse response = otpService.generateOtp(userId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
+  @PostMapping("/generate")
+  public ResponseEntity<OtpGenerationResponse> generateOtp(
+      @RequestBody GenerateOtpRequest request, HttpServletRequest httpRequest) {
+    Long userId = requestAuthService.extractUserId(httpRequest);
+    OtpGenerationResponse response = otpService.generateOtp(userId, request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
 
-    @PostMapping("/validate")
-    public ResponseEntity<OtpValidationResponse> validateOtp(@RequestBody ValidateOtpRequest request,
-                                                             HttpServletRequest httpRequest) {
-        Long userId = requestAuthService.extractUserId(httpRequest);
-        OtpValidationResponse response = otpService.validateOtp(userId, request);
-        return ResponseEntity.ok(response);
-    }
+  @PostMapping("/validate")
+  public ResponseEntity<OtpValidationResponse> validateOtp(
+      @RequestBody ValidateOtpRequest request, HttpServletRequest httpRequest) {
+    Long userId = requestAuthService.extractUserId(httpRequest);
+    OtpValidationResponse response = otpService.validateOtp(userId, request);
+    return ResponseEntity.ok(response);
+  }
 }

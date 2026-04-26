@@ -1,46 +1,46 @@
 package org.example.security;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 class PasswordHasherTest {
 
-    private final PasswordHasher passwordHasher = new PasswordHasher();
+  private final PasswordHasher passwordHasher = new PasswordHasher();
 
-    @Test
-    void hash_shouldCreateHashDifferentFromRawPassword() {
-        String rawPassword = "12345678";
+  @Test
+  void hash_shouldCreateHashDifferentFromRawPassword() {
+    String rawPassword = "12345678";
 
-        String hash = passwordHasher.hash(rawPassword);
+    String hash = passwordHasher.hash(rawPassword);
 
-        assertNotNull(hash);
-        assertNotEquals(rawPassword, hash);
-    }
+    assertNotNull(hash);
+    assertNotEquals(rawPassword, hash);
+  }
 
-    @Test
-    void matches_shouldReturnTrue_forCorrectPassword() {
-        String rawPassword = "12345678";
-        String hash = passwordHasher.hash(rawPassword);
+  @Test
+  void matches_shouldReturnTrue_forCorrectPassword() {
+    String rawPassword = "12345678";
+    String hash = passwordHasher.hash(rawPassword);
 
-        boolean result = passwordHasher.matches(rawPassword, hash);
+    boolean result = passwordHasher.matches(rawPassword, hash);
 
-        assertTrue(result);
-    }
+    assertTrue(result);
+  }
 
-    @Test
-    void matches_shouldReturnFalse_forWrongPassword() {
-        String hash = passwordHasher.hash("12345678");
+  @Test
+  void matches_shouldReturnFalse_forWrongPassword() {
+    String hash = passwordHasher.hash("12345678");
 
-        boolean result = passwordHasher.matches("wrongpass", hash);
+    boolean result = passwordHasher.matches("wrongpass", hash);
 
-        assertFalse(result);
-    }
+    assertFalse(result);
+  }
 
-    @Test
-    void matches_shouldReturnFalse_whenHashIsNull() {
-        boolean result = passwordHasher.matches("12345678", null);
+  @Test
+  void matches_shouldReturnFalse_whenHashIsNull() {
+    boolean result = passwordHasher.matches("12345678", null);
 
-        assertFalse(result);
-    }
+    assertFalse(result);
+  }
 }

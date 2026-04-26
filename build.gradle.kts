@@ -9,7 +9,7 @@ plugins {
     id("org.springframework.boot") version "3.5.13"
     id("io.spring.dependency-management") version "1.1.7"
     id("com.github.spotbugs") version "6.5.1"
-    id("com.diffplug.spotless") version "8.4.0"
+    id("com.diffplug.spotless") version "8.3.0"
 }
 
 group = "org.example"

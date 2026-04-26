@@ -11,86 +11,85 @@ import org.springframework.stereotype.Service;
 @Service
 public class RequestAuthService {
 
-    private final AuthUtil authUtil;
-    private final TokenService tokenService;
-    private final UserRepository userRepository;
+  private final AuthUtil authUtil;
+  private final TokenService tokenService;
+  private final UserRepository userRepository;
 
-    public RequestAuthService(AuthUtil authUtil,
-                              TokenService tokenService,
-                              UserRepository userRepository) {
-        this.authUtil = authUtil;
-        this.tokenService = tokenService;
-        this.userRepository = userRepository;
+  public RequestAuthService(
+      AuthUtil authUtil, TokenService tokenService, UserRepository userRepository) {
+    this.authUtil = authUtil;
+    this.tokenService = tokenService;
+    this.userRepository = userRepository;
+  }
+
+  public RequestUserContext read(HttpServletRequest request) {
+    String token = authUtil.extractToken(request);
+
+    Long userId = tokenService.extractUserId(token);
+    User user = userRepository.findById(userId);
+
+    if (user == null) {
+      throw new UnauthorizedException("Invalid or expired token");
     }
 
-    public RequestUserContext read(HttpServletRequest request) {
-        String token = authUtil.extractToken(request);
-
-        Long userId = tokenService.extractUserId(token);
-        User user = userRepository.findById(userId);
-
-        if (user == null) {
-            throw new UnauthorizedException("Invalid or expired token");
-        }
-
-        if (!tokenService.isTokenCurrentForUser(token, user)) {
-            throw new UnauthorizedException("Invalid or expired token");
-        }
-
-        if (!tokenService.isSessionActive(token)) {
-            throw new UnauthorizedException("Invalid or expired token");
-        }
-
-        return new RequestUserContext(userId, token, user.getRole());
+    if (!tokenService.isTokenCurrentForUser(token, user)) {
+      throw new UnauthorizedException("Invalid or expired token");
     }
 
-    public Long extractUserId(HttpServletRequest request) {
-        return read(request).userId();
+    if (!tokenService.isSessionActive(token)) {
+      throw new UnauthorizedException("Invalid or expired token");
     }
 
-    public Long requireAdminUserId(HttpServletRequest request) {
-        RequestUserContext context = read(request);
+    return new RequestUserContext(userId, token, user.getRole());
+  }
 
-        if (context.role() != Role.ADMIN) {
-            throw new SecurityException("Access denied");
-        }
+  public Long extractUserId(HttpServletRequest request) {
+    return read(request).userId();
+  }
 
-        return context.userId();
+  public Long requireAdminUserId(HttpServletRequest request) {
+    RequestUserContext context = read(request);
+
+    if (context.role() != Role.ADMIN) {
+      throw new SecurityException("Access denied");
     }
 
-    public static final class RequestUserContext {
-        private final Long userId;
-        private final String token;
-        private final Role role;
+    return context.userId();
+  }
 
-        public RequestUserContext(Long userId, String token, Role role) {
-            this.userId = userId;
-            this.token = token;
-            this.role = role;
-        }
+  public static final class RequestUserContext {
+    private final Long userId;
+    private final String token;
+    private final Role role;
 
-        public Long userId() {
-            return userId;
-        }
-
-        public String token() {
-            return token;
-        }
-
-        public Role role() {
-            return role;
-        }
-
-        public Long getUserId() {
-            return userId;
-        }
-
-        public String getToken() {
-            return token;
-        }
-
-        public Role getRole() {
-            return role;
-        }
+    public RequestUserContext(Long userId, String token, Role role) {
+      this.userId = userId;
+      this.token = token;
+      this.role = role;
     }
+
+    public Long userId() {
+      return userId;
+    }
+
+    public String token() {
+      return token;
+    }
+
+    public Role role() {
+      return role;
+    }
+
+    public Long getUserId() {
+      return userId;
+    }
+
+    public String getToken() {
+      return token;
+    }
+
+    public Role getRole() {
+      return role;
+    }
+  }
 }

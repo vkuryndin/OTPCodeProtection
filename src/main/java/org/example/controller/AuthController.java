@@ -14,62 +14,56 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+  private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
-    private final AuthService authService;
-    private final TokenService tokenService;
-    private final RequestAuthService requestAuthService;
+  private final AuthService authService;
+  private final TokenService tokenService;
+  private final RequestAuthService requestAuthService;
 
-    public AuthController(AuthService authService,
-                          TokenService tokenService,
-                          RequestAuthService requestAuthService) {
-        this.authService = authService;
-        this.tokenService = tokenService;
-        this.requestAuthService = requestAuthService;
-    }
+  public AuthController(
+      AuthService authService, TokenService tokenService, RequestAuthService requestAuthService) {
+    this.authService = authService;
+    this.tokenService = tokenService;
+    this.requestAuthService = requestAuthService;
+  }
 
-    @PostMapping("/register")
-    public ResponseEntity<RegisterResponse> register(@RequestBody RegisterRequest request) {
-        Long userId = authService.register(request);
+  @PostMapping("/register")
+  public ResponseEntity<RegisterResponse> register(@RequestBody RegisterRequest request) {
+    Long userId = authService.register(request);
 
-        RegisterResponse response = new RegisterResponse(
-                "User registered successfully",
-                userId
-        );
+    RegisterResponse response = new RegisterResponse("User registered successfully", userId);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
 
-    @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
-        User user = authService.authenticate(request.getLogin(), request.getPassword());
-        String token = tokenService.generateToken(user);
+  @PostMapping("/login")
+  public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+    User user = authService.authenticate(request.getLogin(), request.getPassword());
+    String token = tokenService.generateToken(user);
 
-        LoginResponse response = new LoginResponse(
-                "Login successful",
-                token,
-                user.getId(),
-                user.getLogin(),
-                user.getRole()
-        );
+    LoginResponse response =
+        new LoginResponse("Login successful", token, user.getId(), user.getLogin(), user.getRole());
 
-        return ResponseEntity.ok(response);
-    }
+    return ResponseEntity.ok(response);
+  }
 
-    @PostMapping("/logout")
-    public ResponseEntity<LogoutResponse> logout(HttpServletRequest request) {
-        RequestAuthService.RequestUserContext context = requestAuthService.read(request);
+  @PostMapping("/logout")
+  public ResponseEntity<LogoutResponse> logout(HttpServletRequest request) {
+    RequestAuthService.RequestUserContext context = requestAuthService.read(request);
 
-        tokenService.revokeToken(context.token());
-        log.info("Logout successful: userId={}", context.userId());
+    tokenService.revokeToken(context.token());
+    log.info("Logout successful: userId={}", context.userId());
 
-        LogoutResponse response = new LogoutResponse("Logout successful");
-        return ResponseEntity.ok(response);
-    }
+    LogoutResponse response = new LogoutResponse("Logout successful");
+    return ResponseEntity.ok(response);
+  }
 }

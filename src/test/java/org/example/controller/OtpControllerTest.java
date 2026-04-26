@@ -1,6 +1,15 @@
 package org.example.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.LocalDateTime;
 import org.example.dto.GenerateOtpRequest;
 import org.example.dto.OtpGenerationResponse;
 import org.example.dto.OtpValidationResponse;
@@ -13,195 +22,199 @@ import org.example.service.OtpService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.time.LocalDateTime;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.when;
-import static org.springframework.http.MediaType.APPLICATION_JSON;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(OtpController.class)
 @Import(GlobalExceptionHandler.class)
 class OtpControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+  @Autowired private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+  @Autowired private ObjectMapper objectMapper;
 
-    @MockitoBean
-    private OtpService otpService;
+  @MockitoBean private OtpService otpService;
 
-    @MockitoBean
-    private RequestAuthService requestAuthService;
+  @MockitoBean private RequestAuthService requestAuthService;
 
-    @Test
-    void generateOtp_shouldReturnCreated_whenRequestIsValid() throws Exception {
-        GenerateOtpRequest request = new GenerateOtpRequest();
-        request.setOperationId("op-123");
-        request.setDeliveryChannel(DeliveryChannel.FILE);
-        request.setDeliveryTarget("otp.txt");
+  @Test
+  void generateOtp_shouldReturnCreated_whenRequestIsValid() throws Exception {
+    GenerateOtpRequest request = new GenerateOtpRequest();
+    request.setOperationId("op-123");
+    request.setDeliveryChannel(DeliveryChannel.FILE);
+    request.setDeliveryTarget("otp.txt");
 
-        OtpGenerationResponse response = new OtpGenerationResponse(
-                "OTP generated successfully",
-                10L,
-                "op-123",
-                OtpStatus.ACTIVE,
-                DeliveryChannel.FILE,
-                "otp.txt",
-                LocalDateTime.of(2026, 4, 22, 12, 0)
-        );
+    OtpGenerationResponse response =
+        new OtpGenerationResponse(
+            "OTP generated successfully",
+            10L,
+            "op-123",
+            OtpStatus.ACTIVE,
+            DeliveryChannel.FILE,
+            "otp.txt",
+            LocalDateTime.of(2026, 4, 22, 12, 0));
 
-        when(requestAuthService.extractUserId(any())).thenReturn(1L);
-        when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class))).thenReturn(response);
+    when(requestAuthService.extractUserId(any())).thenReturn(1L);
+    when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class))).thenReturn(response);
 
-        mockMvc.perform(post("/otp/generate")
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.message").value("OTP generated successfully"))
-                .andExpect(jsonPath("$.otpId").value(10))
-                .andExpect(jsonPath("$.operationId").value("op-123"))
-                .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.deliveryChannel").value("FILE"))
-                .andExpect(jsonPath("$.deliveryTarget").value("otp.txt"));
-    }
+    mockMvc
+        .perform(
+            post("/otp/generate")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.message").value("OTP generated successfully"))
+        .andExpect(jsonPath("$.otpId").value(10))
+        .andExpect(jsonPath("$.operationId").value("op-123"))
+        .andExpect(jsonPath("$.status").value("ACTIVE"))
+        .andExpect(jsonPath("$.deliveryChannel").value("FILE"))
+        .andExpect(jsonPath("$.deliveryTarget").value("otp.txt"));
+  }
 
-    @Test
-    void generateOtp_shouldReturnBadRequest_whenServiceThrowsValidationError() throws Exception {
-        GenerateOtpRequest request = new GenerateOtpRequest();
-        request.setOperationId("");
-        request.setDeliveryChannel(DeliveryChannel.FILE);
-        request.setDeliveryTarget("otp.txt");
+  @Test
+  void generateOtp_shouldReturnBadRequest_whenServiceThrowsValidationError() throws Exception {
+    GenerateOtpRequest request = new GenerateOtpRequest();
+    request.setOperationId("");
+    request.setDeliveryChannel(DeliveryChannel.FILE);
+    request.setDeliveryTarget("otp.txt");
 
-        when(requestAuthService.extractUserId(any())).thenReturn(1L);
-        when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class)))
-                .thenThrow(new IllegalArgumentException("Operation ID is required"));
+    when(requestAuthService.extractUserId(any())).thenReturn(1L);
+    when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class)))
+        .thenThrow(new IllegalArgumentException("Operation ID is required"));
 
-        mockMvc.perform(post("/otp/generate")
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("Operation ID is required"));
-    }
+    mockMvc
+        .perform(
+            post("/otp/generate")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("Operation ID is required"));
+  }
 
-    @Test
-    void generateOtp_shouldReturnTooManyRequests_whenRateLimitExceeded() throws Exception {
-        GenerateOtpRequest request = new GenerateOtpRequest();
-        request.setOperationId("op-rate-limit");
-        request.setDeliveryChannel(DeliveryChannel.FILE);
-        request.setDeliveryTarget("otp.txt");
+  @Test
+  void generateOtp_shouldReturnTooManyRequests_whenRateLimitExceeded() throws Exception {
+    GenerateOtpRequest request = new GenerateOtpRequest();
+    request.setOperationId("op-rate-limit");
+    request.setDeliveryChannel(DeliveryChannel.FILE);
+    request.setDeliveryTarget("otp.txt");
 
-        when(requestAuthService.extractUserId(any())).thenReturn(1L);
-        when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class)))
-                .thenThrow(new RateLimitExceededException("Too many OTP generation requests. Try again later."));
+    when(requestAuthService.extractUserId(any())).thenReturn(1L);
+    when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class)))
+        .thenThrow(
+            new RateLimitExceededException("Too many OTP generation requests. Try again later."));
 
-        mockMvc.perform(post("/otp/generate")
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.error").value("Too many OTP generation requests. Try again later."));
-    }
+    mockMvc
+        .perform(
+            post("/otp/generate")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.error").value("Too many OTP generation requests. Try again later."));
+  }
 
-    @Test
-    void generateOtp_shouldReturnServiceUnavailable_whenTelegramApiIsUnavailable() throws Exception {
-        GenerateOtpRequest request = new GenerateOtpRequest();
-        request.setOperationId("op-telegram-unavailable");
-        request.setDeliveryChannel(DeliveryChannel.TELEGRAM);
+  @Test
+  void generateOtp_shouldReturnServiceUnavailable_whenTelegramApiIsUnavailable() throws Exception {
+    GenerateOtpRequest request = new GenerateOtpRequest();
+    request.setOperationId("op-telegram-unavailable");
+    request.setDeliveryChannel(DeliveryChannel.TELEGRAM);
 
-        when(requestAuthService.extractUserId(any())).thenReturn(1L);
-        when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class)))
-                .thenThrow(new RuntimeException("Telegram API is unavailable. Try again later."));
+    when(requestAuthService.extractUserId(any())).thenReturn(1L);
+    when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class)))
+        .thenThrow(new RuntimeException("Telegram API is unavailable. Try again later."));
 
-        mockMvc.perform(post("/otp/generate")
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.error").value("Telegram API is unavailable. Try again later."));
-    }
+    mockMvc
+        .perform(
+            post("/otp/generate")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.error").value("Telegram API is unavailable. Try again later."));
+  }
 
-    @Test
-    void generateOtp_shouldReturnServiceUnavailable_whenEmailServiceIsUnavailable() throws Exception {
-        GenerateOtpRequest request = new GenerateOtpRequest();
-        request.setOperationId("op-email-unavailable");
-        request.setDeliveryChannel(DeliveryChannel.EMAIL);
+  @Test
+  void generateOtp_shouldReturnServiceUnavailable_whenEmailServiceIsUnavailable() throws Exception {
+    GenerateOtpRequest request = new GenerateOtpRequest();
+    request.setOperationId("op-email-unavailable");
+    request.setDeliveryChannel(DeliveryChannel.EMAIL);
 
-        when(requestAuthService.extractUserId(any())).thenReturn(1L);
-        when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class)))
-                .thenThrow(new RuntimeException("Email service is unavailable. Try again later."));
+    when(requestAuthService.extractUserId(any())).thenReturn(1L);
+    when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class)))
+        .thenThrow(new RuntimeException("Email service is unavailable. Try again later."));
 
-        mockMvc.perform(post("/otp/generate")
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.error").value("Email service is unavailable. Try again later."));
-    }
+    mockMvc
+        .perform(
+            post("/otp/generate")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.error").value("Email service is unavailable. Try again later."));
+  }
 
-    @Test
-    void generateOtp_shouldReturnServiceUnavailable_whenSmppSimulatorIsUnavailable() throws Exception {
-        GenerateOtpRequest request = new GenerateOtpRequest();
-        request.setOperationId("op-smpp-unavailable");
-        request.setDeliveryChannel(DeliveryChannel.SMS);
+  @Test
+  void generateOtp_shouldReturnServiceUnavailable_whenSmppSimulatorIsUnavailable()
+      throws Exception {
+    GenerateOtpRequest request = new GenerateOtpRequest();
+    request.setOperationId("op-smpp-unavailable");
+    request.setDeliveryChannel(DeliveryChannel.SMS);
 
-        when(requestAuthService.extractUserId(any())).thenReturn(1L);
-        when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class)))
-                .thenThrow(new RuntimeException("SMPP simulator is not available. Start the SMPP server and try again."));
+    when(requestAuthService.extractUserId(any())).thenReturn(1L);
+    when(otpService.generateOtp(anyLong(), any(GenerateOtpRequest.class)))
+        .thenThrow(
+            new RuntimeException(
+                "SMPP simulator is not available. Start the SMPP server and try again."));
 
-        mockMvc.perform(post("/otp/generate")
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.error").value("SMPP simulator is not available. Start the SMPP server and try again."));
-    }
+    mockMvc
+        .perform(
+            post("/otp/generate")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(
+            jsonPath("$.error")
+                .value("SMPP simulator is not available. Start the SMPP server and try again."));
+  }
 
-    @Test
-    void validateOtp_shouldReturnOk_whenRequestIsValid() throws Exception {
-        ValidateOtpRequest request = new ValidateOtpRequest();
-        request.setOperationId("op-123");
-        request.setCode("123456");
+  @Test
+  void validateOtp_shouldReturnOk_whenRequestIsValid() throws Exception {
+    ValidateOtpRequest request = new ValidateOtpRequest();
+    request.setOperationId("op-123");
+    request.setCode("123456");
 
-        OtpValidationResponse response = new OtpValidationResponse(
-                "OTP validated successfully",
-                10L,
-                "op-123",
-                OtpStatus.USED
-        );
+    OtpValidationResponse response =
+        new OtpValidationResponse("OTP validated successfully", 10L, "op-123", OtpStatus.USED);
 
-        when(requestAuthService.extractUserId(any())).thenReturn(1L);
-        when(otpService.validateOtp(anyLong(), any(ValidateOtpRequest.class))).thenReturn(response);
+    when(requestAuthService.extractUserId(any())).thenReturn(1L);
+    when(otpService.validateOtp(anyLong(), any(ValidateOtpRequest.class))).thenReturn(response);
 
-        mockMvc.perform(post("/otp/validate")
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("OTP validated successfully"))
-                .andExpect(jsonPath("$.otpId").value(10))
-                .andExpect(jsonPath("$.operationId").value("op-123"))
-                .andExpect(jsonPath("$.status").value("USED"));
-    }
+    mockMvc
+        .perform(
+            post("/otp/validate")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.message").value("OTP validated successfully"))
+        .andExpect(jsonPath("$.otpId").value(10))
+        .andExpect(jsonPath("$.operationId").value("op-123"))
+        .andExpect(jsonPath("$.status").value("USED"));
+  }
 
-    @Test
-    void validateOtp_shouldReturnBadRequest_whenServiceThrowsValidationError() throws Exception {
-        ValidateOtpRequest request = new ValidateOtpRequest();
-        request.setOperationId("op-123");
-        request.setCode("000000");
+  @Test
+  void validateOtp_shouldReturnBadRequest_whenServiceThrowsValidationError() throws Exception {
+    ValidateOtpRequest request = new ValidateOtpRequest();
+    request.setOperationId("op-123");
+    request.setCode("000000");
 
-        when(requestAuthService.extractUserId(any())).thenReturn(1L);
-        when(otpService.validateOtp(anyLong(), any(ValidateOtpRequest.class)))
-                .thenThrow(new IllegalArgumentException("Invalid or expired OTP code"));
+    when(requestAuthService.extractUserId(any())).thenReturn(1L);
+    when(otpService.validateOtp(anyLong(), any(ValidateOtpRequest.class)))
+        .thenThrow(new IllegalArgumentException("Invalid or expired OTP code"));
 
-        mockMvc.perform(post("/otp/validate")
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("Invalid or expired OTP code"));
-    }
+    mockMvc
+        .perform(
+            post("/otp/validate")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("Invalid or expired OTP code"));
+  }
 }

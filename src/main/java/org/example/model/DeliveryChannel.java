@@ -1,8 +1,8 @@
 package org.example.model;
 
 public enum DeliveryChannel {
-    EMAIL,
-    SMS,
-    TELEGRAM,
-    FILE
+  EMAIL,
+  SMS,
+  TELEGRAM,
+  FILE
 }

@@ -9,24 +9,24 @@ import org.springframework.stereotype.Service;
 @Service
 public class SessionCleanupService {
 
-    private static final Logger log = LoggerFactory.getLogger(SessionCleanupService.class);
+  private static final Logger log = LoggerFactory.getLogger(SessionCleanupService.class);
 
-    private final UserSessionRepository userSessionRepository;
+  private final UserSessionRepository userSessionRepository;
 
-    public SessionCleanupService(UserSessionRepository userSessionRepository) {
-        this.userSessionRepository = userSessionRepository;
+  public SessionCleanupService(UserSessionRepository userSessionRepository) {
+    this.userSessionRepository = userSessionRepository;
+  }
+
+  @Scheduled(fixedDelayString = "${session.cleanup.fixed-delay-ms:300000}")
+  public void cleanupExpiredSessions() {
+    try {
+      int removed = userSessionRepository.cleanupExpiredSessions();
+
+      if (removed > 0) {
+        log.info("Expired or revoked user sessions removed: count={}", removed);
+      }
+    } catch (Exception e) {
+      log.error("Failed to cleanup user sessions", e);
     }
-
-    @Scheduled(fixedDelayString = "${session.cleanup.fixed-delay-ms:300000}")
-    public void cleanupExpiredSessions() {
-        try {
-            int removed = userSessionRepository.cleanupExpiredSessions();
-
-            if (removed > 0) {
-                log.info("Expired or revoked user sessions removed: count={}", removed);
-            }
-        } catch (Exception e) {
-            log.error("Failed to cleanup user sessions", e);
-        }
-    }
+  }
 }

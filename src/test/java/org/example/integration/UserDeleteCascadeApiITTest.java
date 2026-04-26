@@ -1,6 +1,12 @@
 package org.example.integration;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.UUID;
 import org.example.dto.GenerateOtpRequest;
 import org.example.model.DeliveryChannel;
 import org.example.model.User;
@@ -10,88 +16,79 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.*;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class UserDeleteCascadeApiITTest extends BaseIntegrationTest {
 
-    private String adminLogin;
-    private String userLogin;
+  private String adminLogin;
+  private String userLogin;
 
-    private Long userId;
-    private Path otpFile;
+  private Long userId;
+  private Path otpFile;
 
-    @BeforeEach
-    void setUp() throws IOException {
-        adminLogin = "it_admin_del_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        userLogin = "it_user_del_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+  @BeforeEach
+  void setUp() throws IOException {
+    adminLogin = "it_admin_del_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    userLogin = "it_user_del_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
 
-        otpFile = createOtpFile("delete", userLogin);
+    otpFile = createOtpFile("delete", userLogin);
 
-        deleteUserByLogin(adminLogin);
-        deleteUserByLogin(userLogin);
+    deleteUserByLogin(adminLogin);
+    deleteUserByLogin(userLogin);
 
-        User admin = createAdmin(adminLogin);
-        userRepository.createUser(admin);
+    User admin = createAdmin(adminLogin);
+    userRepository.createUser(admin);
 
-        User user = createUser(userLogin);
-        userId = userRepository.createUser(user);
+    User user = createUser(userLogin);
+    userId = userRepository.createUser(user);
 
-        resetOtpConfig();
-    }
+    resetOtpConfig();
+  }
 
-    @AfterEach
-    void tearDown() throws IOException {
-        deleteUserByLogin(userLogin);
-        deleteUserByLogin(adminLogin);
-        Files.deleteIfExists(otpFile);
-        resetOtpConfig();
-    }
+  @AfterEach
+  void tearDown() throws IOException {
+    deleteUserByLogin(userLogin);
+    deleteUserByLogin(adminLogin);
+    Files.deleteIfExists(otpFile);
+    resetOtpConfig();
+  }
 
-    @Test
-    void deleteUser_shouldAlsoDeleteUserOtpCodes() throws Exception {
-        String userToken = loginAndGetToken(userLogin);
+  @Test
+  void deleteUser_shouldAlsoDeleteUserOtpCodes() throws Exception {
+    String userToken = loginAndGetToken(userLogin);
 
-        GenerateOtpRequest generateRequest = new GenerateOtpRequest();
-        generateRequest.setOperationId("payment-delete-001");
-        generateRequest.setDeliveryChannel(DeliveryChannel.FILE);
-        generateRequest.setDeliveryTarget(otpFile.toString());
+    GenerateOtpRequest generateRequest = new GenerateOtpRequest();
+    generateRequest.setOperationId("payment-delete-001");
+    generateRequest.setDeliveryChannel(DeliveryChannel.FILE);
+    generateRequest.setDeliveryTarget(otpFile.toString());
 
-        ResponseEntity<String> generateResponse = postAuthorized("/otp/generate", userToken, generateRequest);
+    ResponseEntity<String> generateResponse =
+        postAuthorized("/otp/generate", userToken, generateRequest);
 
-        assertEquals(HttpStatus.CREATED, generateResponse.getStatusCode());
-        assertTrue(Files.exists(otpFile));
+    assertEquals(HttpStatus.CREATED, generateResponse.getStatusCode());
+    assertTrue(Files.exists(otpFile));
 
-        long otpCountBeforeDelete = countOtpCodesByUserId(userId);
-        assertTrue(otpCountBeforeDelete > 0, "User should have OTP codes before deletion");
+    long otpCountBeforeDelete = countOtpCodesByUserId(userId);
+    assertTrue(otpCountBeforeDelete > 0, "User should have OTP codes before deletion");
 
-        String adminToken = loginAndGetToken(adminLogin);
+    String adminToken = loginAndGetToken(adminLogin);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(adminToken);
+    HttpHeaders headers = new HttpHeaders();
+    headers.setBearerAuth(adminToken);
 
-        HttpEntity<Void> deleteEntity = new HttpEntity<>(headers);
+    HttpEntity<Void> deleteEntity = new HttpEntity<>(headers);
 
-        ResponseEntity<String> deleteResponse = restTemplate.exchange(
-                "/admin/users/" + userId,
-                HttpMethod.DELETE,
-                deleteEntity,
-                String.class
-        );
+    ResponseEntity<String> deleteResponse =
+        restTemplate.exchange(
+            "/admin/users/" + userId, HttpMethod.DELETE, deleteEntity, String.class);
 
-        assertEquals(HttpStatus.OK, deleteResponse.getStatusCode());
-        assertNotNull(deleteResponse.getBody());
+    assertEquals(HttpStatus.OK, deleteResponse.getStatusCode());
+    assertNotNull(deleteResponse.getBody());
 
-        JsonNode deleteBody = objectMapper.readTree(deleteResponse.getBody());
-        assertEquals("User deleted successfully", deleteBody.get("message").asText());
-        assertEquals(userId.longValue(), deleteBody.get("userId").asLong());
+    JsonNode deleteBody = objectMapper.readTree(deleteResponse.getBody());
+    assertEquals("User deleted successfully", deleteBody.get("message").asText());
+    assertEquals(userId.longValue(), deleteBody.get("userId").asLong());
 
-        assertFalse(userExistsById(userId), "User should be deleted");
-        assertEquals(0, countOtpCodesByUserId(userId), "User OTP codes should be deleted by cascade");
-    }
+    assertFalse(userExistsById(userId), "User should be deleted");
+    assertEquals(0, countOtpCodesByUserId(userId), "User OTP codes should be deleted by cascade");
+  }
 }
