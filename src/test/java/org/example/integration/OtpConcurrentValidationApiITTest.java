@@ -64,7 +64,11 @@ class OtpConcurrentValidationApiITTest extends BaseIntegrationTest {
     // almost одновременно and expose potential double-consume race conditions.
     Callable<ResponseEntity<String>> task =
         () -> {
-          startLatch.await(5, TimeUnit.SECONDS);
+          boolean started = startLatch.await(5, TimeUnit.SECONDS);
+          if (!started) {
+            throw new IllegalStateException(
+                "Failed to start concurrent validation scenario in time");
+          }
           return postAuthorized(
               "/otp/validate", token, TestRequests.validateOtp(operationId, code));
         };

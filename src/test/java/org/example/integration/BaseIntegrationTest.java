@@ -111,8 +111,15 @@ public abstract class BaseIntegrationTest {
 
   protected Path createOtpFile(String prefix, String login) throws IOException {
     Path otpFile = Path.of("build", "test-otp", prefix + "-" + login + ".txt");
-    Files.createDirectories(otpFile.getParent());
+
+    Path parent = otpFile.getParent();
+    if (parent == null) {
+      throw new IllegalStateException("OTP file parent path is missing");
+    }
+
+    Files.createDirectories(parent);
     Files.deleteIfExists(otpFile);
+
     return otpFile;
   }
 

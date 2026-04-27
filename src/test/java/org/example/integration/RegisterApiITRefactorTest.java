@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Locale;
 import java.util.UUID;
+import org.example.model.Role;
 import org.example.model.User;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,16 +58,8 @@ class RegisterApiITRefactorTest extends BaseIntegrationTest {
   @Test
   void register_shouldCreateUser_whenRequestIsValid() throws Exception {
     String requestBody =
-        """
-                {
-                  "login": "%s",
-                  "password": "%s",
-                  "role": "USER",
-                  "email": "%s@test.com",
-                  "phone": "+37400112233"
-                }
-                """
-            .formatted(userLogin, PASSWORD, userLogin);
+        registerRequestJson(
+            userLogin, PASSWORD, Role.USER, userLogin + "@test.com", "+37400112233");
 
     ResponseEntity<String> response = postRegisterJson(requestBody);
 
@@ -84,16 +77,8 @@ class RegisterApiITRefactorTest extends BaseIntegrationTest {
     String mixedCaseLogin = userLogin.toUpperCase(Locale.ROOT);
 
     String requestBody =
-        """
-                {
-                  "login": "%s",
-                  "password": "%s",
-                  "role": "USER",
-                  "email": "%s@test.com",
-                  "phone": "+37400112233"
-                }
-                """
-            .formatted(mixedCaseLogin, PASSWORD, userLogin);
+        registerRequestJson(
+            mixedCaseLogin, PASSWORD, Role.USER, userLogin + "@test.com", "+37400112233");
 
     ResponseEntity<String> response = postRegisterJson(requestBody);
 
@@ -110,16 +95,8 @@ class RegisterApiITRefactorTest extends BaseIntegrationTest {
   @Test
   void register_shouldReturnBadRequest_whenLoginAlreadyExists() throws Exception {
     String requestBody =
-        """
-                {
-                  "login": "%s",
-                  "password": "%s",
-                  "role": "USER",
-                  "email": "%s@test.com",
-                  "phone": "+37400112233"
-                }
-                """
-            .formatted(duplicateLogin, PASSWORD, duplicateLogin);
+        registerRequestJson(
+            duplicateLogin, PASSWORD, Role.USER, duplicateLogin + "@test.com", "+37400112233");
 
     ResponseEntity<String> response = postRegisterJson(requestBody);
 
@@ -135,16 +112,12 @@ class RegisterApiITRefactorTest extends BaseIntegrationTest {
     String duplicateLoginWithDifferentCase = duplicateLogin.toUpperCase(Locale.ROOT);
 
     String requestBody =
-        """
-                {
-                  "login": "%s",
-                  "password": "%s",
-                  "role": "USER",
-                  "email": "%s@test.com",
-                  "phone": "+37400112233"
-                }
-                """
-            .formatted(duplicateLoginWithDifferentCase, PASSWORD, duplicateLogin);
+        registerRequestJson(
+            duplicateLoginWithDifferentCase,
+            PASSWORD,
+            Role.USER,
+            duplicateLogin + "@test.com",
+            "+37400112233");
 
     ResponseEntity<String> response = postRegisterJson(requestBody);
 
@@ -158,16 +131,8 @@ class RegisterApiITRefactorTest extends BaseIntegrationTest {
   @Test
   void register_shouldReturnConflict_whenSecondAdminIsCreated() throws Exception {
     String requestBody =
-        """
-                {
-                  "login": "%s",
-                  "password": "%s",
-                  "role": "ADMIN",
-                  "email": "%s@test.com",
-                  "phone": "+37400110000"
-                }
-                """
-            .formatted(secondAdminLogin, PASSWORD, secondAdminLogin);
+        registerRequestJson(
+            secondAdminLogin, PASSWORD, Role.ADMIN, secondAdminLogin + "@test.com", "+37400110000");
 
     ResponseEntity<String> response = postRegisterJson(requestBody);
 
@@ -189,5 +154,17 @@ class RegisterApiITRefactorTest extends BaseIntegrationTest {
 
   private String shortId() {
     return UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+  }
+
+  private String registerRequestJson(
+      String login, String password, Role role, String email, String phone) {
+    return ("{%n"
+            + "  \"login\": \"%s\",%n"
+            + "  \"password\": \"%s\",%n"
+            + "  \"role\": \"%s\",%n"
+            + "  \"email\": \"%s\",%n"
+            + "  \"phone\": \"%s\"%n"
+            + "}")
+        .formatted(login, password, role.name(), email, phone);
   }
 }
