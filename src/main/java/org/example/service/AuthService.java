@@ -24,13 +24,11 @@ public class AuthService {
 
   private final UserRepository userRepository;
   private final PasswordHasher passwordHasher;
-  private final TokenService tokenService;
 
   public AuthService(
       UserRepository userRepository, PasswordHasher passwordHasher, TokenService tokenService) {
     this.userRepository = userRepository;
     this.passwordHasher = passwordHasher;
-    this.tokenService = tokenService;
   }
 
   public Long register(RegisterRequest request) {
@@ -103,15 +101,6 @@ public class AuthService {
         user.getRole());
 
     return user;
-  }
-
-  public String loginAndGenerateToken(String login, String password) {
-    User user = authenticate(login, password);
-    String token = tokenService.generateToken(user);
-
-    log.info("JWT token issued: userId={}, login={}", user.getId(), user.getLogin());
-
-    return token;
   }
 
   private void validateRegisterRequest(RegisterRequest request) {

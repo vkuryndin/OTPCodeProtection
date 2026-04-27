@@ -67,7 +67,10 @@ class OtpConcurrentBruteforceApiITTest extends BaseIntegrationTest {
     // a brute-force burst against the same user + operationId.
     Callable<ResponseEntity<String>> task =
         () -> {
-          startLatch.await(5, TimeUnit.SECONDS);
+          boolean started = startLatch.await(5, TimeUnit.SECONDS);
+          if (!started) {
+            throw new IllegalStateException("Failed to start concurrent scenario in time");
+          }
           return postAuthorized(
               "/otp/validate", token, TestRequests.validateOtp(operationId, "000000"));
         };

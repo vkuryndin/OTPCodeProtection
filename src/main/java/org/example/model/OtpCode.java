@@ -10,37 +10,10 @@ public class OtpCode {
   private OtpStatus status;
   private DeliveryChannel deliveryChannel;
   private String deliveryTarget;
-  private LocalDateTime createdAt;
   private LocalDateTime expiresAt;
   private LocalDateTime sentAt;
-  private LocalDateTime usedAt;
 
   public OtpCode() {}
-
-  public OtpCode(
-      Long id,
-      Long userId,
-      String operationId,
-      String code,
-      OtpStatus status,
-      DeliveryChannel deliveryChannel,
-      String deliveryTarget,
-      LocalDateTime createdAt,
-      LocalDateTime expiresAt,
-      LocalDateTime sentAt,
-      LocalDateTime usedAt) {
-    this.id = id;
-    this.userId = userId;
-    this.operationId = operationId;
-    this.code = code;
-    this.status = status;
-    this.deliveryChannel = deliveryChannel;
-    this.deliveryTarget = deliveryTarget;
-    this.createdAt = createdAt;
-    this.expiresAt = expiresAt;
-    this.sentAt = sentAt;
-    this.usedAt = usedAt;
-  }
 
   public Long getId() {
     return id;
@@ -98,14 +71,6 @@ public class OtpCode {
     this.deliveryTarget = deliveryTarget;
   }
 
-  public LocalDateTime getCreatedAt() {
-    return createdAt;
-  }
-
-  public void setCreatedAt(LocalDateTime createdAt) {
-    this.createdAt = createdAt;
-  }
-
   public LocalDateTime getExpiresAt() {
     return expiresAt;
   }
@@ -120,13 +85,5 @@ public class OtpCode {
 
   public void setSentAt(LocalDateTime sentAt) {
     this.sentAt = sentAt;
-  }
-
-  public LocalDateTime getUsedAt() {
-    return usedAt;
-  }
-
-  public void setUsedAt(LocalDateTime usedAt) {
-    this.usedAt = usedAt;
   }
 }

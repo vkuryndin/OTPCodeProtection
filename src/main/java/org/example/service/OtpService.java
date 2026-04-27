@@ -90,7 +90,7 @@ public class OtpService {
     Long otpId = otpCodeRepository.createOtpCodeReplacingActive(otpCode);
 
     try {
-      deliverOtp(otpId, userId, otpCode, code, expiresAt);
+      deliverOtp(userId, otpCode, code, expiresAt);
     } catch (RuntimeException e) {
       cleanupFailedDeliveryOtp(otpId, userId, otpCode, e);
       throw e;
@@ -303,8 +303,7 @@ public class OtpService {
     return code.toString();
   }
 
-  private void deliverOtp(
-      Long otpId, Long userId, OtpCode otpCode, String code, LocalDateTime expiresAt) {
+  private void deliverOtp(Long userId, OtpCode otpCode, String code, LocalDateTime expiresAt) {
     switch (otpCode.getDeliveryChannel()) {
       case FILE ->
           fileDeliveryService.saveOtpToFile(

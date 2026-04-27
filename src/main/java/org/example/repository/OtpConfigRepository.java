@@ -4,7 +4,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import org.example.model.OtpConfig;
 import org.springframework.stereotype.Repository;
 
@@ -58,11 +57,6 @@ public class OtpConfigRepository {
     config.setId(rs.getInt("id"));
     config.setCodeLength(rs.getInt("code_length"));
     config.setTtlSeconds(rs.getInt("ttl_seconds"));
-
-    Timestamp updatedAt = rs.getTimestamp("updated_at");
-    if (updatedAt != null) {
-      config.setUpdatedAt(updatedAt.toLocalDateTime());
-    }
 
     return config;
   }

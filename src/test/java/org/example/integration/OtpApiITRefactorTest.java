@@ -201,7 +201,10 @@ class OtpApiITRefactorTest extends BaseIntegrationTest {
 
       Callable<ResponseEntity<String>> generateTask =
           () -> {
-            startLatch.await(5, TimeUnit.SECONDS);
+            boolean started = startLatch.await(5, TimeUnit.SECONDS);
+            if (!started) {
+              throw new IllegalStateException("Failed to start concurrent scenario in time");
+            }
             return postAuthorized(
                 "/otp/generate",
                 token,
@@ -210,7 +213,10 @@ class OtpApiITRefactorTest extends BaseIntegrationTest {
 
       Callable<ResponseEntity<String>> validateTask =
           () -> {
-            startLatch.await(5, TimeUnit.SECONDS);
+            boolean started = startLatch.await(5, TimeUnit.SECONDS);
+            if (!started) {
+              throw new IllegalStateException("Failed to start concurrent scenario in time");
+            }
             return postAuthorized(
                 "/otp/validate", token, TestRequests.validateOtp(operationId, oldCode));
           };

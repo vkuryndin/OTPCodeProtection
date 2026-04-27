@@ -1,0 +1,28 @@
+{
+  "properties": [
+    {
+      "name": "otp.generate-rate-limit.enabled",
+      "type": "java.lang.Boolean"
+    },
+    {
+      "name": "otp.generate-rate-limit.max-attempts",
+      "type": "java.lang.Integer"
+    },
+    {
+      "name": "otp.generate-rate-limit.window-seconds",
+      "type": "java.lang.Long"
+    },
+    {
+      "name": "otp.generate-rate-limit.cleanup.fixed-delay-ms",
+      "type": "java.lang.Long"
+    },
+    {
+      "name": "otp.validation-attempt-cleanup.fixed-delay-ms",
+      "type": "java.lang.Long"
+    },
+    {
+      "name": "session.cleanup.fixed-delay-ms",
+      "type": "java.lang.Long"
+    }
+  ]
+}

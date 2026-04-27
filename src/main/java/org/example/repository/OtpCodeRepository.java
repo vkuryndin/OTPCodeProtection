@@ -204,9 +204,7 @@ public class OtpCodeRepository {
       statement.setInt(2, operationId.hashCode());
 
       try (ResultSet rs = statement.executeQuery()) {
-        if (!rs.next()) {
-          throw new SQLException("Failed to acquire advisory transaction lock");
-        }
+        rs.next();
       }
     }
   }
@@ -234,10 +232,10 @@ public class OtpCodeRepository {
     otpCode.setStatus(OtpStatus.valueOf(rs.getString("status")));
     otpCode.setDeliveryChannel(DeliveryChannel.valueOf(rs.getString("delivery_channel")));
     otpCode.setDeliveryTarget(rs.getString("delivery_target"));
-    otpCode.setCreatedAt(toLocalDateTime(rs.getTimestamp("created_at")));
+
     otpCode.setExpiresAt(toLocalDateTime(rs.getTimestamp("expires_at")));
     otpCode.setSentAt(toLocalDateTime(rs.getTimestamp("sent_at")));
-    otpCode.setUsedAt(toLocalDateTime(rs.getTimestamp("used_at")));
+
     return otpCode;
   }
 

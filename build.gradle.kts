@@ -9,7 +9,7 @@ plugins {
     id("org.springframework.boot") version "3.5.13"
     id("io.spring.dependency-management") version "1.1.7"
     id("com.github.spotbugs") version "6.5.1"
-    id("com.diffplug.spotless") version "8.3.0"
+    id("com.diffplug.spotless") version "8.4.0"
 }
 
 group = "org.example"
@@ -70,15 +70,17 @@ tasks.withType<SpotBugsTask>().configureEach {
 // Spotless
 spotless {
     java {
-        target("src/main/java/**/*.java", "src/test/java/**/*.java")
+        target("src/**/*.java")
         googleJavaFormat()
+        removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()
     }
 
-    kotlinGradle {
+    format("gradleKts") {
         target("*.gradle.kts")
-        ktlint()
+        trimTrailingWhitespace()
+        endWithNewline()
     }
 }
 

@@ -7,7 +7,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.example.integration.support.TestRequests;
 import org.example.model.User;
 import org.junit.jupiter.api.AfterEach;
@@ -60,7 +65,10 @@ class OtpGenerateConcurrentRateLimitApiITTest extends BaseIntegrationTest {
 
     Callable<ResponseEntity<String>> task1 =
         () -> {
-          startLatch.await(5, TimeUnit.SECONDS);
+          boolean started = startLatch.await(5, TimeUnit.SECONDS);
+          if (!started) {
+            throw new IllegalStateException("Failed to start concurrent scenario in time");
+          }
           return postAuthorized(
               "/otp/generate",
               token,
@@ -69,7 +77,10 @@ class OtpGenerateConcurrentRateLimitApiITTest extends BaseIntegrationTest {
 
     Callable<ResponseEntity<String>> task2 =
         () -> {
-          startLatch.await(5, TimeUnit.SECONDS);
+          boolean started = startLatch.await(5, TimeUnit.SECONDS);
+          if (!started) {
+            throw new IllegalStateException("Failed to start concurrent scenario in time");
+          }
           return postAuthorized(
               "/otp/generate",
               token,
