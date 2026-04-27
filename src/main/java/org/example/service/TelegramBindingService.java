@@ -47,6 +47,8 @@ public class TelegramBindingService {
     this.botToken = botToken;
   }
 
+  // Starts Telegram binding by generating a temporary bind token
+  // and sending the user a link to the bot.
   public Map<String, Object> startBinding(Long userId) {
     User user = requireUser(userId);
 
@@ -79,6 +81,8 @@ public class TelegramBindingService {
     return response;
   }
 
+  // Completes Telegram binding after the user opens the bot link.
+  // On success the user's telegram_chat_id is stored in the database.
   public Map<String, Object> completeBinding(Long userId) {
     User user = requireUser(userId);
 

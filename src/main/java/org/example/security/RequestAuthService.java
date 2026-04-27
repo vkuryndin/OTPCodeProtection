@@ -22,6 +22,9 @@ public class RequestAuthService {
     this.userRepository = userRepository;
   }
 
+  // Full auth check for protected endpoints:
+  // extract Bearer token, validate JWT, load user, verify credential version
+  // and ensure that the persistent session is still active.
   public RequestUserContext read(HttpServletRequest request) {
     String token = authUtil.extractToken(request);
 
@@ -47,6 +50,7 @@ public class RequestAuthService {
     return read(request).userId();
   }
 
+  // Reuses the common auth flow and then applies an additional role check for ADMIN endpoints.
   public Long requireAdminUserId(HttpServletRequest request) {
     RequestUserContext context = read(request);
 

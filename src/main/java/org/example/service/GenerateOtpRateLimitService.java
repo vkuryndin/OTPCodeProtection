@@ -29,6 +29,8 @@ public class GenerateOtpRateLimitService {
     this.windowSeconds = Math.max(1, windowSeconds);
   }
 
+  // In-memory rate limit protects the generate OTP endpoint from rapid repeated requests.
+  // This is a soft protection for a single application instance.
   public synchronized void validateAndRegisterAttempt(Long userId) {
     if (!enabled) {
       return;
@@ -59,6 +61,8 @@ public class GenerateOtpRateLimitService {
   }
 
   @Scheduled(fixedDelayString = "${otp.generate-rate-limit.cleanup.fixed-delay-ms:600000}")
+  // Periodically removes expired rate-limit windows from memory
+  // to prevent unbounded growth of the in-memory storage.
   public void cleanupExpiredWindows() {
     if (!enabled) {
       attemptsByUserId.clear();

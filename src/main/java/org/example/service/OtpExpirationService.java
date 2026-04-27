@@ -17,6 +17,8 @@ public class OtpExpirationService {
     this.otpCodeRepository = otpCodeRepository;
   }
 
+  // Background job that marks expired ACTIVE OTP codes as EXPIRED.
+  // This keeps OTP status consistent even when a code is never explicitly validated.
   @Scheduled(fixedRate = 30000)
   public void expireCodes() {
     try {

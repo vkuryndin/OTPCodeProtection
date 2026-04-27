@@ -18,6 +18,9 @@ public class SessionCleanupService {
   }
 
   @Scheduled(fixedDelayString = "${session.cleanup.fixed-delay-ms:300000}")
+
+  // Periodically removes expired and revoked sessions from the database.
+  // This cleanup is not required for auth correctness, but keeps user_sessions compact.
   public void cleanupExpiredSessions() {
     try {
       int removed = userSessionRepository.cleanupExpiredSessions();

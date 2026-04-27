@@ -67,6 +67,10 @@ public class OtpService {
     this.generateOtpRateLimitService = generateOtpRateLimitService;
   }
 
+  // Generates exactly one актуальный OTP for the user and operation.
+  // For the same userId + operationId the previous ACTIVE code is expired before a new one is
+  // created.
+
   public OtpGenerationResponse generateOtp(Long userId, GenerateOtpRequest request) {
     validateGenerateRequest(userId, request);
 
@@ -114,6 +118,8 @@ public class OtpService {
         otpCode.getExpiresAt());
   }
 
+  // OTP validation uses an atomic repository operation, so one code cannot be successfully reused
+  // in concurrent requests.
   public OtpValidationResponse validateOtp(Long userId, ValidateOtpRequest request) {
     validateValidateRequest(userId, request);
 
@@ -254,6 +260,8 @@ public class OtpService {
     return otpCode;
   }
 
+  // If delivery fails after OTP creation, remove the just-created record
+  // so the database does not keep an ACTIVE code that was never actually delivered.
   private void cleanupFailedDeliveryOtp(
       Long otpId, Long userId, OtpCode otpCode, RuntimeException originalError) {
     log.error(
@@ -428,6 +436,8 @@ public class OtpService {
     }
   }
 
+  // deliveryTarget is allowed only for FILE.
+  // For EMAIL, SMS and TELEGRAM the destination is taken from the user's profile in the database.
   private void validateDeliveryTargetRules(Long userId, GenerateOtpRequest request) {
     DeliveryChannel channel = request.getDeliveryChannel();
     String deliveryTarget = request.getDeliveryTarget();

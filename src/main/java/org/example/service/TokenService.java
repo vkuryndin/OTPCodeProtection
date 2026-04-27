@@ -40,6 +40,8 @@ public final class TokenService {
     this.userSessionRepository = userSessionRepository;
   }
 
+  // JWT contains tokenId (jti) and is backed by a persistent session in the database.
+  // Session state is used for logout and active-session checks.
   public String generateToken(User user) {
     Instant now = Instant.now();
     Instant expiresAt = now.plus(expirationMinutes, ChronoUnit.MINUTES);
@@ -81,12 +83,16 @@ public final class TokenService {
     return buildCredentialVersion(user).equals(tokenCredentialVersion);
   }
 
+  // A token is considered active only when its database session exists,
+  // is not revoked and has not expired yet.
   public boolean isSessionActive(String token) {
     Claims claims = parseClaims(token);
     String tokenId = claims.getId();
     return tokenId != null && userSessionRepository.isSessionActive(tokenId);
   }
 
+  // Logout does not just discard JWT on the client side.
+  // It revokes the corresponding persistent session in the database.
   public void revokeToken(String token) {
     Claims claims = parseClaims(token);
     String tokenId = claims.getId();
@@ -96,6 +102,8 @@ public final class TokenService {
     }
   }
 
+  // Returns users with active sessions.
+  // Expired and revoked sessions are cleaned up before building the response.
   public List<LoggedInUserResponse> getLoggedInUsers() {
     userSessionRepository.cleanupExpiredSessions();
     return userSessionRepository.findLoggedInUsers();

@@ -91,6 +91,8 @@ public class OtpCodeRepository {
             SELECT pg_advisory_xact_lock(?, ?)
             """;
 
+  // Replaces the currently active OTP for the same userId + operationId atomically:
+  // first expires old ACTIVE codes, then inserts the new one in the same transaction.
   public Long createOtpCodeReplacingActive(OtpCode otpCode) {
     try (Connection connection = ConnectionFactory.getConnection()) {
       boolean originalAutoCommit = connection.getAutoCommit();
@@ -120,6 +122,8 @@ public class OtpCodeRepository {
     }
   }
 
+  // Consumes OTP atomically in one SQL statement.
+  // This prevents two concurrent validations from successfully using the same code twice.
   public OtpCode consumeActiveCode(Long userId, String operationId, String code) {
     try (Connection connection = ConnectionFactory.getConnection();
         PreparedStatement statement = connection.prepareStatement(CONSUME_ACTIVE_CODE_SQL)) {
@@ -196,6 +200,9 @@ public class OtpCodeRepository {
       return statement.executeUpdate();
     }
   }
+
+  // PostgreSQL advisory lock serializes OTP generation for the same userId + operationId pair
+  // inside one transaction and prevents two concurrent requests from creating two ACTIVE codes.
 
   private void acquireGenerationLock(Connection connection, Long userId, String operationId)
       throws SQLException {
