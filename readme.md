@@ -33,6 +33,7 @@ Backend-сервис для защиты операций одноразовым
 - интеграции с внешними каналами доставки;
 - автоматизации тестирования;
 - базового security hardening для OTP-потока.
+
 ---
 
 ## Используемые технологии
@@ -113,7 +114,7 @@ otpService/
 │   │   │       │
 │   │   │       ├── exception/
 │   │   │       │   ├── NotFoundException.java
-│   │   │       │   └── UnauthorizedException.java
+│   │   │       │   ├── UnauthorizedException.java
 │   │   │       │   └── RateLimitExceededException.java
 │   │   │       │   # прикладные исключения
 │   │   │       │
@@ -161,7 +162,7 @@ otpService/
 │   │   │
 │   │   └── resources/
 │   │       ├── META-INF/
-│   │       │   └──additional-spring-configurations-metadata.json 
+│   │       │   └──additional-spring-configuration-metadata.json 
 │   │       ├── application.properties
 │   │       ├── db.properties.example
 │   │       └── db/
@@ -236,7 +237,7 @@ otpService/
 │           ├── application-test.properties
 │           ├── db.properties
 │           └── testAPI.http
-│           # test profile, test database и ручные HTTP-сценарии
+│           # тестовый профиль, тестовая база данных и ручные HTTP-сценарии
 ```
 ### Описание пакетов проекта
 
@@ -486,7 +487,7 @@ http://localhost:8080
 
 В проекте есть:
 - unit-тесты;
-- controller tests;
+- тесты контроллеров;
 - интеграционные API-тесты.
 
 Проверяются:
@@ -504,14 +505,14 @@ http://localhost:8080
 - защита от brute force на валидацию OTP;
 - атомарный сценарий использования OTP;
 - настройка ограничения генерации OTP;
-- cleanup stale-записей для validation attempts и generate rate limit;
+- очистка устаревших записей для validation attempts и generate rate limit;
 - перевод старых активных OTP в `EXPIRED` при повторной генерации для той же операции;
 - конкурентная валидация OTP;
 - конкурентная генерация OTP для одной и той же операции;
 - controller-level проверки `429` для rate limit;
 - controller-level проверки `503` для недоступности внешних каналов доставки;
 - хранение пользовательских сессий в базе данных;
-- cleanup истёкших и отозванных пользовательских сессий;
+- cleanup истёкших и отозванных пользовательских сессий.
 
 ### Запуск тестов
 

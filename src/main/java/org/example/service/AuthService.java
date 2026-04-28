@@ -25,8 +25,7 @@ public class AuthService {
   private final UserRepository userRepository;
   private final PasswordHasher passwordHasher;
 
-  public AuthService(
-      UserRepository userRepository, PasswordHasher passwordHasher, TokenService tokenService) {
+  public AuthService(UserRepository userRepository, PasswordHasher passwordHasher) {
     this.userRepository = userRepository;
     this.passwordHasher = passwordHasher;
   }

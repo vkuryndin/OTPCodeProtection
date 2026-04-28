@@ -24,15 +24,6 @@ public final class TestRequests {
     return request;
   }
 
-  public static GenerateOtpRequest generateOtp(
-      String operationId, DeliveryChannel channel, String deliveryTarget) {
-    GenerateOtpRequest request = new GenerateOtpRequest();
-    request.setOperationId(operationId);
-    request.setDeliveryChannel(channel);
-    request.setDeliveryTarget(deliveryTarget);
-    return request;
-  }
-
   public static ValidateOtpRequest validateOtp(String operationId, String code) {
     ValidateOtpRequest request = new ValidateOtpRequest();
     request.setOperationId(operationId);
