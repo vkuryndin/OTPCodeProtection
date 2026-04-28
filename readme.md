@@ -114,6 +114,7 @@ otpService/
 │   │   │       ├── exception/
 │   │   │       │   ├── NotFoundException.java
 │   │   │       │   └── UnauthorizedException.java
+│   │   │       │   └── RateLimitExceededException.java
 │   │   │       │   # прикладные исключения
 │   │   │       │
 │   │   │       ├── model/
@@ -159,8 +160,9 @@ otpService/
 │   │   │           # общая валидация входных данных для auth-запросов
 │   │   │
 │   │   └── resources/
+│   │       ├── META-INF/
+│   │       │   └──additional-spring-configurations-metadata.json 
 │   │       ├── application.properties
-│   │       ├── db.properties
 │   │       ├── db.properties.example
 │   │       └── db/
 │   │           └── migration/
